@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Neon Cyan Chef Hat Body -->
+    <path
+        android:fillColor="#E0F7FA"
+        android:pathData="M38,54 C33,52 32,43 38,38 C41,34 49,35 52,39 C54,32 63,31 67,37 C73,34 80,41 77,47 C81,52 77,59 71,59 L37,59 C35,59 34,56 38,54 Z" />
+
+    <!-- Hat Base Band -->
+    <path
+        android:fillColor="#B2EBF2"
+        android:pathData="M39,59 L69,59 C70.6,59 72,60.4 72,62 L72,69 C72,70.6 70.6,72 69,72 L39,72 C37.4,72 36,70.6 36,69 L36,62 C36,60.4 37.4,59 39,59 Z" />
+
+    <!-- Neon Pink Stripes -->
+    <path
+        android:fillColor="#FF4081"
+        android:pathData="M43,62 L46,62 L46,69 L43,69 Z M52,62 L56,62 L56,69 L52,69 Z M62,62 L65,62 L65,69 L62,69 Z" />
+
+    <!-- Neon Magenta Flame -->
+    <path
+        android:fillColor="#FF4081"
+        android:pathData="M54,34 C58,40 60,43 57,48 C55.5,50.5 52.5,51 51,48 C50,46 51,43.5 52.5,41.5 C49,43 47,46 47,49 C47,53.5 50.5,56 54,56 C58,56 61,53 61,48 C61,42 56,36 54,34 Z" />
+
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M54,43 C56,46 57,48 55.5,51 C54.5,52.5 53,52.5 52,51 C51.5,50 52,48.5 53,47.5 C51,48.5 50,50 50,51.5 C50,53.5 51.5,55 54,55 C56,55 57.5,53.5 57.5,51 C57.5,47.5 55,44.5 54,43 Z" />
+
+    <!-- Cyan Neon Sparkle -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M29,38 L31,42 L35,44 L31,46 L29,50 L27,46 L23,44 L27,42 Z" />
+
+</vector>

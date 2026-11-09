@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Deep Night Navy Background -->
+    <path
+        android:fillColor="#0D111A"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <!-- Indigo Circular Glow -->
+    <path
+        android:fillColor="#1B2234"
+        android:pathData="M54,14 A40,40 0 1 0 54,94 A40,40 0 1 0 54,14 Z" />
+
+    <!-- Midnight Accent Ring -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#307C4DFF"
+        android:strokeWidth="1.5"
+        android:pathData="M54,15 A39,39 0 1 0 54,93 A39,39 0 1 0 54,15 Z" />
+
+</vector>

@@ -11,6 +11,7 @@ import com.aetnox.cooking.domain.parser.ParsedRecipe
 import com.aetnox.cooking.domain.parser.RecipeImportParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -35,13 +36,13 @@ private data class GeminiContent(
 @Serializable
 private data class GeminiPart(
     val text: String? = null,
-    val inline_data: InlineData? = null,
+    @SerialName("inline_data") val inlineData: InlineData? = null,
     val thought: Boolean? = null
 )
 
 @Serializable
 private data class InlineData(
-    val mime_type: String,
+    @SerialName("mime_type") val mimeType: String,
     val data: String
 )
 
@@ -115,7 +116,7 @@ object GeminiApiService {
         if (!imageUriStr.isNullOrBlank()) {
             val inlineData = readImageAsInlineData(context, imageUriStr)
             if (inlineData != null) {
-                parts.add(GeminiPart(inline_data = inlineData))
+                parts.add(GeminiPart(inlineData = inlineData))
             }
         }
 
@@ -152,7 +153,7 @@ object GeminiApiService {
                 val errorMsg = try {
                     val errResp = json.decodeFromString<GeminiResponse>(bodyStr)
                     errResp.error?.message ?: "Ошибка HTTP ${response.code}: ${response.message}"
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     "Ошибка HTTP ${response.code}: $bodyStr"
                 }
                 throw IllegalStateException("Ошибка Gemini API: $errorMsg")
@@ -162,7 +163,7 @@ object GeminiApiService {
 
         val geminiResp = json.decodeFromString<GeminiResponse>(responseText)
         val candidateText = geminiResp.candidates?.firstOrNull()?.content?.parts
-            ?.filter { it.thought != true && !it.text.isNullOrBlank() }
+            ?.filter { (it.thought != true) && !it.text.isNullOrBlank() }
             ?.mapNotNull { it.text }
             ?.joinToString("")
             ?: ""
@@ -370,9 +371,8 @@ object GeminiApiService {
         // Thinking-модели отдают рассуждение отдельными частями (thought=true):
         // берём ответные части целиком, склеивая их, а не первую попавшуюся
         val allParts = geminiResp.candidates?.firstOrNull()?.content?.parts.orEmpty()
-        val answerParts = allParts.filter { it.thought != true && !it.text.isNullOrBlank() }
-        val textParts = (if (answerParts.isNotEmpty()) answerParts
-        else allParts.filter { !it.text.isNullOrBlank() })
+        val answerParts = allParts.filter { (it.thought != true) && !it.text.isNullOrBlank() }
+        val textParts = answerParts.ifEmpty { allParts.filter { !it.text.isNullOrBlank() } }
             .mapNotNull { it.text }
             .joinToString("\n")
             .trim()
@@ -393,6 +393,11 @@ object GeminiApiService {
             clean = clean.removeSuffix("```")
         }
         return clean.trim()
+    }
+
+    fun readImageBase64(context: Context, uriStr: String): Pair<String, String>? {
+        val inline = readImageAsInlineData(context, uriStr) ?: return null
+        return Pair(inline.data, inline.mimeType)
     }
 
     private fun readImageAsInlineData(context: Context, uriStr: String): InlineData? {
@@ -428,10 +433,10 @@ object GeminiApiService {
             bitmap.recycle()
 
             InlineData(
-                mime_type = outputMime,
+                mimeType = outputMime,
                 data = Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

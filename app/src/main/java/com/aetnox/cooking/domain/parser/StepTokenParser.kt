@@ -4,16 +4,16 @@ sealed class StepSegment {
     data class TextSegment(val text: String) : StepSegment()
     data class IngredientTokenSegment(
         val ingredientName: String,
-        val rawToken: String
+        val rawToken: String,
     ) : StepSegment()
 }
 
 object StepTokenParser {
 
-    private val TOKEN_REGEX = Regex("""@\[([^\]]+)\]|@\{([^\}]+)\}""")
+    private val TOKEN_REGEX = Regex("""@\[([^]]+)\]|@\{([^}]+)\}""")
 
     /**
-     * Inserts an ingredient token `@[IngredientName]` into the text at the given cursor position.
+     * Inserts an ingredient token into the text at the given cursor position.
      */
     fun insertToken(text: String, selectionStart: Int, ingredientName: String): Pair<String, Int> {
         val safeIndex = selectionStart.coerceIn(0, text.length)

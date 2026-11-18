@@ -335,3 +335,100 @@ val NeonPalette = ThemePalette(
     surfaceContainerLow = Color(0xFF14141B),
     surfaceContainerHigh = Color(0xFF22222A)
 )
+
+// --- Nothing OS: Строгий монохром (#000000 / #141414) + Nothing Red (#D71921) ---
+val NothingDarkPalette = ThemePalette(
+    primary = Color(0xFFD71921),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF2B0A0C),
+    onPrimaryContainer = Color(0xFFFFD5D7),
+    secondary = Color(0xFFFFFFFF),
+    onSecondary = Color(0xFF000000),
+    secondaryContainer = Color(0xFF262629),
+    onSecondaryContainer = Color(0xFFFFFFFF),
+    tertiary = Color(0xFFD71921),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFF2B0A0C),
+    onTertiaryContainer = Color(0xFFFFD5D7),
+    surface = Color(0xFF000000),
+    onSurface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFF141414),
+    onSurfaceVariant = Color(0xFF8E8E93),
+    outline = Color(0xFF262629),
+    outlineVariant = Color(0xFF1F1F22),
+    surfaceContainerLow = Color(0xFF000000),
+    surfaceContainerHigh = Color(0xFF141414)
+)
+
+val NothingLightPalette = ThemePalette(
+    primary = Color(0xFFD71921),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFDADB),
+    onPrimaryContainer = Color(0xFF410005),
+    secondary = Color(0xFF000000),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFE5E5E5),
+    onSecondaryContainer = Color(0xFF000000),
+    tertiary = Color(0xFFD71921),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFFFDADB),
+    onTertiaryContainer = Color(0xFF410005),
+    surface = Color(0xFFF2F2F2),
+    onSurface = Color(0xFF000000),
+    surfaceVariant = Color(0xFFFFFFFF),
+    onSurfaceVariant = Color(0xFF6E6E73),
+    outline = Color(0xFFE0E0E0),
+    outlineVariant = Color(0xFFEBEBEB),
+    surfaceContainerLow = Color(0xFFF2F2F2),
+    surfaceContainerHigh = Color(0xFFFFFFFF)
+)
+
+fun buildCustomPalette(primary: Color, secondary: Color, isDark: Boolean): ThemePalette {
+    return if (isDark) {
+        ThemePalette(
+            primary = primary,
+            onPrimary = Color.Black,
+            primaryContainer = primary.copy(alpha = 0.3f),
+            onPrimaryContainer = Color.White,
+            secondary = secondary,
+            onSecondary = Color.Black,
+            secondaryContainer = secondary.copy(alpha = 0.3f),
+            onSecondaryContainer = Color.White,
+            tertiary = secondary,
+            onTertiary = Color.Black,
+            tertiaryContainer = secondary.copy(alpha = 0.2f),
+            onTertiaryContainer = Color.White,
+            surface = Color(0xFF141416),
+            onSurface = Color(0xFFE3E3E6),
+            surfaceVariant = Color(0xFF28282E),
+            onSurfaceVariant = Color(0xFFC6C6D0),
+            outline = Color(0xFF888890),
+            outlineVariant = Color(0xFF383840),
+            surfaceContainerLow = Color(0xFF1A1A1D),
+            surfaceContainerHigh = Color(0xFF242428)
+        )
+    } else {
+        ThemePalette(
+            primary = primary,
+            onPrimary = Color.White,
+            primaryContainer = primary.copy(alpha = 0.15f),
+            onPrimaryContainer = primary,
+            secondary = secondary,
+            onSecondary = Color.White,
+            secondaryContainer = secondary.copy(alpha = 0.15f),
+            onSecondaryContainer = secondary,
+            tertiary = secondary,
+            onTertiary = Color.White,
+            tertiaryContainer = secondary.copy(alpha = 0.1f),
+            onTertiaryContainer = secondary,
+            surface = Color(0xFFFBFBFD),
+            onSurface = Color(0xFF1A1A1C),
+            surfaceVariant = Color(0xFFE6E6EC),
+            onSurfaceVariant = Color(0xFF44444A),
+            outline = Color(0xFF767680),
+            outlineVariant = Color(0xFFC6C6D0),
+            surfaceContainerLow = Color(0xFFF4F4F8),
+            surfaceContainerHigh = Color(0xFFEAEAEE)
+        )
+    }
+}

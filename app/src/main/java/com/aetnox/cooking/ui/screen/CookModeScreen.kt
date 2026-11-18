@@ -1,8 +1,6 @@
 package com.aetnox.cooking.ui.screen
 
-import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.Context
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.VibrationEffect
@@ -30,6 +28,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -49,15 +50,22 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -79,6 +87,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -94,6 +103,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.aetnox.cooking.data.entity.IngredientEntity
 import com.aetnox.cooking.data.entity.RecipeEntity
@@ -102,7 +112,9 @@ import com.aetnox.cooking.domain.net.ExperimentalSettingsManager
 import com.aetnox.cooking.domain.parser.StepSegment
 import com.aetnox.cooking.domain.parser.StepTokenParser
 import com.aetnox.cooking.ui.component.CookAssistantSheet
+import com.aetnox.cooking.ui.component.StarRatingBar
 import com.aetnox.cooking.ui.component.StepTimerCard
+import com.aetnox.cooking.ui.util.AppLocaleManager
 import com.aetnox.cooking.ui.util.FullscreenMediaDialog
 import com.aetnox.cooking.ui.util.MediaViewerUtils
 import com.aetnox.cooking.ui.viewmodel.CookModeViewModel
@@ -117,6 +129,7 @@ enum class CookViewTab {
 @Composable
 fun CookModeScreen(
     viewModel: CookModeViewModel,
+    initialTab: CookViewTab = CookViewTab.STEP_BY_STEP,
     onNavigateBack: () -> Unit,
     onNavigateToEdit: (Long) -> Unit
 ) {
@@ -124,7 +137,7 @@ fun CookModeScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    var activeTab by remember { mutableStateOf(CookViewTab.STEP_BY_STEP) }
+    var activeTab by remember(initialTab) { mutableStateOf(initialTab) }
     var showCustomServingsDialog by remember { mutableStateOf(false) }
     var customServingsInput by remember { mutableStateOf("") }
     var selectedFullscreenMediaUri by remember { mutableStateOf<String?>(null) }
@@ -134,20 +147,6 @@ fun CookModeScreen(
     // Экспериментальная функция: при выключенной настройке или отключённом ИИ UI ассистента не существует
     val netSettings = ExperimentalSettingsManager.getSettings(context)
     val cookAssistantEnabled = netSettings.cookAssistantEnabled && !netSettings.aiDisabled
-
-    // TIMER COMPLETION AUDIO SOUND & VIBRATION ALERT
-    val finishedTimerStepNumbers = remember(uiState.stepTimers) {
-        uiState.stepTimers.filter { it.value.isFinished }.keys
-    }
-    var playedFinishedTimers by remember { mutableStateOf<Set<Int>>(emptySet()) }
-
-    LaunchedEffect(finishedTimerStepNumbers) {
-        val newlyFinished = finishedTimerStepNumbers - playedFinishedTimers
-        if (newlyFinished.isNotEmpty()) {
-            playTimerCompletionAlert(context)
-            playedFinishedTimers = playedFinishedTimers + newlyFinished
-        }
-    }
 
     // KEEP SCREEN AWAKE EFFECT
     DisposableEffect(uiState.keepScreenOn) {
@@ -164,8 +163,52 @@ fun CookModeScreen(
 
     val recipeDetails = uiState.recipeWithDetails
     if (recipeDetails == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Загрузка рецепта...")
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            if (uiState.recipeNotFound) AppLocaleManager.tr("Рецепт не найден", "Recipe not found") else AppLocaleManager.tr("Загрузка рецепта...", "Loading recipe..."),
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppLocaleManager.tr("Назад", "Back"))
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                if (uiState.recipeNotFound) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("😕", style = MaterialTheme.typography.displayLarge)
+                        Text(
+                            AppLocaleManager.tr("Рецепт не найден.\nВозможно, он был удалён.", "Recipe not found.\nIt might have been deleted."),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(onClick = onNavigateBack, shape = RoundedCornerShape(14.dp)) {
+                            Text(AppLocaleManager.tr("Назад к списку", "Back to list"))
+                        }
+                    }
+                } else {
+                    CircularProgressIndicator(strokeWidth = 3.dp)
+                }
+            }
         }
         return
     }
@@ -175,6 +218,19 @@ fun CookModeScreen(
     val totalSteps = sortedSteps.size
     val totalVirtualSteps = totalSteps + 1 // Step 0 = Prep Ingredients, Steps 1..N = Cooking steps
 
+    LaunchedEffect(recipe.id, uiState.activeStepIndex, uiState.prepCheckedIngredients, uiState.stepCheckedTokens, uiState.currentServings) {
+        com.aetnox.cooking.ui.util.ActiveCookingManager.saveProgress(
+            context = context,
+            recipeId = recipe.id,
+            recipeTitle = recipe.title,
+            activeStepIndex = uiState.activeStepIndex,
+            totalSteps = sortedSteps.size,
+            checkedIngredients = uiState.prepCheckedIngredients,
+            stepCheckedTokens = uiState.stepCheckedTokens,
+            currentServings = uiState.currentServings
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -183,17 +239,31 @@ fun CookModeScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppLocaleManager.tr("Назад", "Back"))
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.toggleFavorite() }) {
+                        Icon(
+                            imageVector = if (recipe.isFavorite) Icons.Default.Star else Icons.Outlined.Star,
+                            contentDescription = AppLocaleManager.tr("Избранное", "Favorite"),
+                            tint = if (recipe.isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    IconButton(onClick = { viewModel.toggleCartStatus() }) {
+                        Icon(
+                            imageVector = if (recipe.isInCart) Icons.Default.ShoppingCart else Icons.Outlined.ShoppingCart,
+                            contentDescription = AppLocaleManager.tr("Корзина", "Cart"),
+                            tint = if (recipe.isInCart) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                     if (cookAssistantEnabled) {
                         IconButton(onClick = { showAssistant = true }) {
-                            Icon(Icons.Default.SmartToy, contentDescription = "ИИ-ассистент")
+                            Icon(Icons.Default.SmartToy, contentDescription = AppLocaleManager.tr("ИИ-ассистент", "AI Assistant"))
                         }
                     }
                     IconButton(onClick = { onNavigateToEdit(recipe.id) }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Редактировать рецепт")
+                        Icon(Icons.Default.Edit, contentDescription = AppLocaleManager.tr("Редактировать рецепт", "Edit recipe"))
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -218,23 +288,26 @@ fun CookModeScreen(
             )
         },
         bottomBar = {
-            Surface(
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp)
+            if (uiState.activeStepIndex == totalSteps) {
+                Surface(
+                    shadowElevation = 8.dp,
+                    color = MaterialTheme.colorScheme.surface
                 ) {
-                    Button(
-                        onClick = { viewModel.showPostCookDialog() },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Завершить готовку", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = { viewModel.showPostCookDialog() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(AppLocaleManager.tr("Завершить готовку", "Finish Cooking"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -251,27 +324,73 @@ fun CookModeScreen(
                 Tab(
                     selected = activeTab == CookViewTab.STEP_BY_STEP,
                     onClick = { activeTab = CookViewTab.STEP_BY_STEP },
-                    text = { Text("👨‍🍳 Шаг за шагом", fontWeight = FontWeight.Bold) }
+                    text = { Text(AppLocaleManager.tr("👨‍🍳 Шаг за шагом", "👨‍🍳 Step-by-step"), fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = activeTab == CookViewTab.OVERVIEW,
                     onClick = { activeTab = CookViewTab.OVERVIEW },
-                    text = { Text("📋 Обзор рецепта", fontWeight = FontWeight.Bold) }
+                    text = { Text(AppLocaleManager.tr("📋 Обзор рецепта", "📋 Overview"), fontWeight = FontWeight.Bold) }
                 )
             }
 
             if (activeTab == CookViewTab.STEP_BY_STEP) {
-                // Interactive Step-by-Step Pager View
-                val currentVirtualStep = uiState.activeStepIndex.coerceIn(0, totalVirtualSteps - 1)
-                val progressFraction = (currentVirtualStep + 1).toFloat() / totalVirtualSteps.toFloat()
+                // Interactive Step-by-Step Horizontal Pager View
+                val pagerState = rememberPagerState(
+                    initialPage = uiState.activeStepIndex.coerceIn(0, totalVirtualSteps - 1),
+                    pageCount = { totalVirtualSteps }
+                )
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                LaunchedEffect(uiState.activeStepIndex) {
+                    if (pagerState.currentPage != uiState.activeStepIndex) {
+                        pagerState.animateScrollToPage(uiState.activeStepIndex.coerceIn(0, totalVirtualSteps - 1))
+                    }
+                }
+
+                LaunchedEffect(pagerState.currentPage) {
+                    if (uiState.activeStepIndex != pagerState.currentPage) {
+                        viewModel.setActiveStepIndex(pagerState.currentPage)
+                    }
+                }
+
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Horizontal Step Navigation Bar (Quick Jump Bar)
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        items(count = totalVirtualSteps, key = { it }) { stepIdx ->
+                            val isSelected = pagerState.currentPage == stepIdx
+                            val label = if (stepIdx == 0) AppLocaleManager.tr("🛒 Подготовка", "🛒 Preparation") else AppLocaleManager.tr("Шаг $stepIdx", "Step $stepIdx")
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.setActiveStepIndex(stepIdx) },
+                                label = {
+                                    Text(
+                                        text = label,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        val currentVirtualStep = page
+                        val progressFraction = (currentVirtualStep + 1).toFloat() / totalVirtualSteps.toFloat()
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+
                     // Progress Bar & Step Counter Header
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -285,7 +404,7 @@ fun CookModeScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (currentVirtualStep == 0) "ПОДГОТОВКА ИНГРЕДИЕНТОВ" else "ШАГ $currentVirtualStep ИЗ $totalSteps",
+                                    text = if (currentVirtualStep == 0) AppLocaleManager.tr("ПОДГОТОВКА ИНГРЕДИЕНТОВ", "INGREDIENTS PREPARATION") else AppLocaleManager.tr("ШАГ $currentVirtualStep ИЗ $totalSteps", "STEP $currentVirtualStep OF $totalSteps"),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -295,12 +414,21 @@ fun CookModeScreen(
                                     TextButton(onClick = { showIngredientsSheetInStepMode = !showIngredientsSheetInStepMode }) {
                                         Icon(Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text(if (showIngredientsSheetInStepMode) "Скрыть продукты" else "🛒 Продукты")
+                                        Text(if (showIngredientsSheetInStepMode) AppLocaleManager.tr("Скрыть продукты", "Hide items") else AppLocaleManager.tr("🛒 Продукты", "🛒 Products"))
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(6.dp))
+                            if (uiState.keepScreenOn) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = AppLocaleManager.tr("💡 Экран включен и не погаснет в процессе готовки", "💡 Screen stays on during cooking"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             LinearProgressIndicator(
                                 progress = { progressFraction },
@@ -311,6 +439,29 @@ fun CookModeScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)
                             )
+
+                            val totalPrepIngs = recipeDetails.ingredients.size
+                            val checkedPrepIngs = uiState.prepCheckedIngredients.size
+                            if (currentVirtualStep > 0 && checkedPrepIngs < totalPrepIngs) {
+                                val missingCount = totalPrepIngs - checkedPrepIngs
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = AppLocaleManager.tr("ℹ️ На этапе подготовки не отмечено продуктов: $missingCount из $totalPrepIngs", "ℹ️ Ingredients unchecked in preparation: $missingCount of $totalPrepIngs"),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -323,18 +474,19 @@ fun CookModeScreen(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = "🛒 Необходимые ингредиенты:",
+                                    text = AppLocaleManager.tr("🛒 Необходимые ингредиенты:", "🛒 Required ingredients:"),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 recipeDetails.ingredients.forEach { ing ->
+                                    val isStepChecked = uiState.stepCheckedTokens.contains("${currentVirtualStep}_${ing.id}")
                                     IngredientChecklistItem(
                                         ingredient = ing,
                                         baseServings = recipe.baseServings,
                                         currentServings = uiState.currentServings,
-                                        isChecked = uiState.checkedIngredients.contains(ing.id),
-                                        onToggleCheck = { viewModel.toggleIngredientChecked(ing.id) },
+                                        isChecked = isStepChecked,
+                                        onToggleCheck = { viewModel.toggleStepIngredientChecked(currentVirtualStep, ing.id) },
                                         onSelectUnit = { newUnit ->
                                             viewModel.onUnitSelectedForIngredient(ing.id, newUnit)
                                         }
@@ -350,7 +502,7 @@ fun CookModeScreen(
                         val recipeImages = remember(recipe.imageUrisJson) {
                             try {
                                 kotlinx.serialization.json.Json.decodeFromString<List<String>>(recipe.imageUrisJson)
-                            } catch (e: Exception) { emptyList() }
+                            } catch (_: Exception) { emptyList() }
                         }
 
                         if (recipeImages.isNotEmpty()) {
@@ -361,14 +513,14 @@ fun CookModeScreen(
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
-                                        text = "📷 Фотографии блюда (${recipeImages.size}):",
+                                        text = "${AppLocaleManager.tr("📷 Фотографии блюда", "📷 Dish photos")} (${recipeImages.size}):",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        items(recipeImages) { uriStr ->
+                                        items(recipeImages, key = { it }) { uriStr ->
                                             val isVideo = MediaViewerUtils.isVideoUri(uriStr, context)
                                             Box(
                                                 modifier = Modifier
@@ -390,7 +542,7 @@ fun CookModeScreen(
                                                             .background(Color.Black.copy(alpha = 0.6f), CircleShape),
                                                         contentAlignment = Alignment.Center
                                                     ) {
-                                                        Icon(Icons.Default.PlayArrow, contentDescription = "Видео", tint = Color.White)
+                                                        Icon(Icons.Default.PlayArrow, contentDescription = AppLocaleManager.tr("Видео", "Video"), tint = Color.White)
                                                     }
                                                 }
                                             }
@@ -407,14 +559,14 @@ fun CookModeScreen(
                         ) {
                             Column(modifier = Modifier.padding(20.dp)) {
                                 Text(
-                                    text = "🛒 Подготовьте ингредиенты:",
+                                    text = "🛒 ${AppLocaleManager.tr("Подготовьте ингредиенты:", "Prepare ingredients:")}",
                                     style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Отмерьте и подготовьте все необходимые продукты перед началом готовки:",
+                                    text = AppLocaleManager.tr("Отмерьте и подготовьте все необходимые продукты перед началом готовки:", "Measure and prepare all required ingredients before cooking:"),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -433,17 +585,18 @@ fun CookModeScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            val yieldLabel = if (AppLocaleManager.isEnglish && recipe.yieldUnit == "порций") "servings" else recipe.yieldUnit
                                             Text(
-                                                text = "Порций: ${UnitConverter.formatAmount(uiState.currentServings, "шт")} ${recipe.yieldUnit}",
+                                                text = "${AppLocaleManager.tr("Порций", "Servings")}: ${UnitConverter.formatAmount(uiState.currentServings, "шт")} $yieldLabel",
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 IconButton(onClick = { viewModel.decrementServings() }, modifier = Modifier.size(32.dp)) {
-                                                    Icon(Icons.Default.Remove, contentDescription = "Меньше")
+                                                    Icon(Icons.Default.Remove, contentDescription = AppLocaleManager.tr("Меньше", "Less"))
                                                 }
                                                 IconButton(onClick = { viewModel.incrementServings() }, modifier = Modifier.size(32.dp)) {
-                                                    Icon(Icons.Default.Add, contentDescription = "Больше")
+                                                    Icon(Icons.Default.Add, contentDescription = AppLocaleManager.tr("Больше", "More"))
                                                 }
                                             }
                                         }
@@ -496,13 +649,17 @@ fun CookModeScreen(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
                             Column(modifier = Modifier.padding(20.dp)) {
+                                val stepCheckedIngs = remember(uiState.stepCheckedTokens, recipeDetails.ingredients, currentStepNum) {
+                                    recipeDetails.ingredients.filter { uiState.stepCheckedTokens.contains("${currentStepNum}_${it.id}") }.map { it.id }.toSet()
+                                }
+
                                 StepTextWithBadges(
                                     instructionText = currentStep.instructionText,
                                     ingredients = recipeDetails.ingredients,
                                     baseServings = recipe.baseServings,
                                     currentServings = uiState.currentServings,
-                                    checkedIngredients = uiState.checkedIngredients,
-                                    onToggleIngredientCheck = { ingId -> viewModel.toggleIngredientChecked(ingId) }
+                                    checkedIngredients = stepCheckedIngs,
+                                    onToggleIngredientCheck = { ingId -> viewModel.toggleStepIngredientChecked(currentStepNum, ingId) }
                                 )
 
                                 // Step Timer if defined or running
@@ -513,11 +670,10 @@ fun CookModeScreen(
                                         secondsRemaining = timerState?.secondsRemaining ?: durationToUse,
                                         isRunning = timerState?.isRunning == true,
                                         isFinished = timerState?.isFinished == true,
-                                        onStartPause = { viewModel.startOrPauseStepTimer(currentStepNum, durationToUse) },
-                                        onReset = { viewModel.resetStepTimer(currentStepNum) },
+                                        onStartPause = { viewModel.startOrPauseStepTimer(context, currentStepNum, durationToUse) },
+                                        onReset = { viewModel.resetStepTimer(context, currentStepNum) },
                                         onAddSeconds = { addSecs ->
-                                            val currentRem = timerState?.secondsRemaining ?: durationToUse
-                                            viewModel.startOrPauseStepTimer(currentStepNum, currentRem + addSecs)
+                                            viewModel.addTimeToStepTimer(context, currentStepNum, addSecs)
                                         }
                                     )
                                 }
@@ -526,17 +682,17 @@ fun CookModeScreen(
                                 val stepImages = remember(currentStep.imageUrisJson) {
                                     try {
                                         kotlinx.serialization.json.Json.decodeFromString<List<String>>(currentStep.imageUrisJson)
-                                    } catch (e: Exception) { emptyList() }
+                                    } catch (_: Exception) { emptyList() }
                                 }
                                 if (stepImages.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(16.dp))
                                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        items(stepImages) { uriStr ->
+                                        items(stepImages, key = { it }) { uriStr ->
                                             val isVideo = MediaViewerUtils.isVideoUri(uriStr, context)
                                             Box(
                                                 modifier = Modifier
                                                     .size(120.dp)
-                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .clip(RoundedCornerShape(8.dp))
                                                     .clickable { selectedFullscreenMediaUri = uriStr },
                                                 contentAlignment = Alignment.Center
                                             ) {
@@ -553,7 +709,7 @@ fun CookModeScreen(
                                                             .background(Color.Black.copy(alpha = 0.6f), CircleShape),
                                                         contentAlignment = Alignment.Center
                                                     ) {
-                                                        Icon(Icons.Default.PlayArrow, contentDescription = "Видео", tint = Color.White)
+                                                        Icon(Icons.Default.PlayArrow, contentDescription = AppLocaleManager.tr("Видео", "Video"), tint = Color.White)
                                                     }
                                                 }
                                             }
@@ -578,7 +734,7 @@ fun CookModeScreen(
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Назад")
+                            Text(AppLocaleManager.tr("Назад", "Back"))
                         }
 
                         Spacer(modifier = Modifier.width(12.dp))
@@ -595,14 +751,16 @@ fun CookModeScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = if (currentVirtualStep == 0) "Начать готовку ▶" else if (currentVirtualStep < totalVirtualSteps - 1) "Вперед" else "Готово"
+                                text = if (currentVirtualStep == 0) AppLocaleManager.tr("Начать готовку ▶", "Start cooking ▶") else if (currentVirtualStep < totalVirtualSteps - 1) AppLocaleManager.tr("Вперед", "Next") else AppLocaleManager.tr("Готово", "Done")
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                         }
                     }
                 }
-            } else {
+            }
+        }
+    } else {
                 // OVERVIEW MODE (Scrollable Full Recipe View)
                 Column(
                     modifier = Modifier
@@ -619,7 +777,7 @@ fun CookModeScreen(
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
-                                    text = "📝 Быстрая заметка черновика",
+                                    text = "📝 ${AppLocaleManager.tr("Быстрая заметка черновика", "Quick draft note")}",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -648,7 +806,7 @@ fun CookModeScreen(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = "👨‍🍳 Шпаргалка шефа",
+                                    text = "👨‍🍳 ${AppLocaleManager.tr("Шпаргалка шефа", "Chef's cheat sheet")}",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -656,7 +814,7 @@ fun CookModeScreen(
 
                                 if (recipe.chefHeatingType.isNotBlank()) {
                                     Text(
-                                        text = "🔥 Нагрев: ${recipe.chefHeatingType}",
+                                        text = "🔥 ${AppLocaleManager.tr("Нагрев", "Heating")}: ${recipe.chefHeatingType}",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
@@ -664,7 +822,7 @@ fun CookModeScreen(
 
                                 if (recipe.chefTemperature.isNotBlank()) {
                                     Text(
-                                        text = "🌡 Температура: ${recipe.chefTemperature}",
+                                        text = "🌡 ${AppLocaleManager.tr("Температура", "Temperature")}: ${recipe.chefTemperature}",
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -672,9 +830,9 @@ fun CookModeScreen(
                                 }
 
                                 if (recipe.chefTiming.isNotBlank() || recipe.cookTimeMinutes > 0) {
-                                    val timeText = recipe.chefTiming.ifBlank { "${recipe.cookTimeMinutes} мин" }
+                                    val timeText = recipe.chefTiming.ifBlank { "${recipe.cookTimeMinutes} ${AppLocaleManager.tr("мин", "min")}" }
                                     Text(
-                                        text = "⏱ Тайминг: $timeText",
+                                        text = "⏱ ${AppLocaleManager.tr("Тайминг", "Timing")}: $timeText",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
@@ -682,7 +840,7 @@ fun CookModeScreen(
 
                                 if (recipe.chefReadinessSign.isNotBlank()) {
                                     Text(
-                                        text = "✨ Признак готовности: ${recipe.chefReadinessSign}",
+                                        text = "✨ ${AppLocaleManager.tr("Признак готовности", "Readiness sign")}: ${recipe.chefReadinessSign}",
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -700,28 +858,30 @@ fun CookModeScreen(
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
-                                    text = "📊 Пищевая ценность (на порцию)",
+                                    text = "📊 ${AppLocaleManager.tr("Пищевая ценность (на порцию)", "Nutritional Value (per serving)")}",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
+                                val calWord = AppLocaleManager.tr("ккал", "kcal")
+                                val gWord = AppLocaleManager.tr("г", "g")
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     recipe.calories?.let {
-                                        Text("🔥 ${it.toInt()} ккал", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text("🔥 ${it.toInt()} $calWord", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                                     }
                                     recipe.protein?.let {
-                                        Text("🥩 Б: ${UnitConverter.formatAmount(it, "г")}г", style = MaterialTheme.typography.bodyMedium)
+                                        Text("🥩 ${AppLocaleManager.tr("Б", "P")}: ${UnitConverter.formatAmount(it, "г")}$gWord", style = MaterialTheme.typography.bodyMedium)
                                     }
                                     recipe.fat?.let {
-                                        Text("🧈 Ж: ${UnitConverter.formatAmount(it, "г")}г", style = MaterialTheme.typography.bodyMedium)
+                                        Text("🧈 ${AppLocaleManager.tr("Ж", "F")}: ${UnitConverter.formatAmount(it, "г")}$gWord", style = MaterialTheme.typography.bodyMedium)
                                     }
                                     recipe.carbs?.let {
-                                        Text("🌾 У: ${UnitConverter.formatAmount(it, "г")}г", style = MaterialTheme.typography.bodyMedium)
+                                        Text("🌾 ${AppLocaleManager.tr("У", "C")}: ${UnitConverter.formatAmount(it, "г")}$gWord", style = MaterialTheme.typography.bodyMedium)
                                     }
                                 }
                             }
@@ -742,12 +902,13 @@ fun CookModeScreen(
                                 ) {
                                     Column {
                                         Text(
-                                            text = "Масштабирование порций",
+                                            text = AppLocaleManager.tr("Масштабирование порций", "Servings scaling"),
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold
                                         )
+                                        val yieldLabel = if (AppLocaleManager.isEnglish && recipe.yieldUnit == "порций") "servings" else recipe.yieldUnit
                                         Text(
-                                            text = "Базово: ${UnitConverter.formatAmount(recipe.baseServings, "шт")} ${recipe.yieldUnit}",
+                                            text = "${AppLocaleManager.tr("Базово", "Base")}: ${UnitConverter.formatAmount(recipe.baseServings, "шт")} $yieldLabel",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -755,7 +916,7 @@ fun CookModeScreen(
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(onClick = { viewModel.decrementServings() }) {
-                                            Icon(Icons.Default.Remove, contentDescription = "Меньше")
+                                            Icon(Icons.Default.Remove, contentDescription = AppLocaleManager.tr("Меньше", "Less"))
                                         }
 
                                         Box(
@@ -763,13 +924,14 @@ fun CookModeScreen(
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                                                 .clickable {
-                                                    customServingsInput = UnitConverter.formatAmount(uiState.currentServings, "шт")
+                                                    customServingsInput = UnitConverter.formatAmount(uiState.currentServings, AppLocaleManager.tr("шт", "pcs"))
                                                     showCustomServingsDialog = true
                                                 }
                                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                                         ) {
+                                            val yieldLabel = if (AppLocaleManager.isEnglish && recipe.yieldUnit == "порций") "servings" else recipe.yieldUnit
                                             Text(
-                                                text = "${UnitConverter.formatAmount(uiState.currentServings, "шт")} ${recipe.yieldUnit}",
+                                                text = "${UnitConverter.formatAmount(uiState.currentServings, AppLocaleManager.tr("шт", "pcs"))} $yieldLabel",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.primary
@@ -777,7 +939,7 @@ fun CookModeScreen(
                                         }
 
                                         IconButton(onClick = { viewModel.incrementServings() }) {
-                                            Icon(Icons.Default.Add, contentDescription = "Больше")
+                                            Icon(Icons.Default.Add, contentDescription = AppLocaleManager.tr("Больше", "More"))
                                         }
                                     }
                                 }
@@ -789,7 +951,7 @@ fun CookModeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Пресеты:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${AppLocaleManager.tr("Пресеты", "Presets")}:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     listOf(0.5 to "½x", 1.0 to "1x", 2.0 to "2x", 3.0 to "3x").forEach { (mult, label) ->
                                         val targetServings = (recipe.baseServings * mult).coerceAtLeast(0.5)
                                         val isSelected = (uiState.currentServings - targetServings).let { kotlin.math.abs(it) < 0.05 }
@@ -815,7 +977,7 @@ fun CookModeScreen(
                     // INGREDIENT CHECKLIST WITH GROUPS
                     Column {
                         Text(
-                            text = "🛒 Чек-лист ингредиентов",
+                            text = "🛒 ${AppLocaleManager.tr("Чек-лист ингредиентов", "Ingredients Checklist")}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -854,7 +1016,7 @@ fun CookModeScreen(
                     // FULL STEPS LIST IN OVERVIEW MODE
                     Column {
                         Text(
-                            text = "👨‍🍳 Шаги приготовления (${sortedSteps.size})",
+                            text = "👨‍🍳 ${AppLocaleManager.tr("Шаги приготовления", "Cooking steps")} (${sortedSteps.size})",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -875,8 +1037,9 @@ fun CookModeScreen(
                                 timerState = timerState,
                                 isActiveStep = isActive,
                                 onSelectStep = { viewModel.setActiveStepIndex(index + 1) },
-                                onStartOrPauseTimer = { duration -> viewModel.startOrPauseStepTimer(step.stepNumber, duration) },
-                                onResetTimer = { viewModel.resetStepTimer(step.stepNumber) },
+                                onStartOrPauseTimer = { duration -> viewModel.startOrPauseStepTimer(context, step.stepNumber, duration) },
+                                onResetTimer = { viewModel.resetStepTimer(context, step.stepNumber) },
+                                onAddTimeToTimer = { addSecs -> viewModel.addTimeToStepTimer(context, step.stepNumber, addSecs) },
                                 onToggleIngredientCheck = { ingId -> viewModel.toggleIngredientChecked(ingId) },
                                 onSelectMedia = { uriStr -> selectedFullscreenMediaUri = uriStr }
                             )
@@ -892,12 +1055,13 @@ fun CookModeScreen(
     if (showCustomServingsDialog) {
         AlertDialog(
             onDismissRequest = { showCustomServingsDialog = false },
-            title = { Text("Введите количество порций") },
+            title = { Text(AppLocaleManager.tr("Введите количество порций", "Enter number of servings")) },
             text = {
+                val yieldLabel = if (AppLocaleManager.isEnglish && recipe.yieldUnit == "порций") "servings" else recipe.yieldUnit
                 OutlinedTextField(
                     value = customServingsInput,
                     onValueChange = { customServingsInput = it },
-                    label = { Text("Порции (${recipe.yieldUnit})") },
+                    label = { Text("${AppLocaleManager.tr("Порции", "Servings")} ($yieldLabel)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
@@ -912,12 +1076,12 @@ fun CookModeScreen(
                         showCustomServingsDialog = false
                     }
                 ) {
-                    Text("Применить")
+                    Text(AppLocaleManager.tr("Применить", "Apply"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showCustomServingsDialog = false }) {
-                    Text("Отмена")
+                    Text(AppLocaleManager.tr("Отмена", "Cancel"))
                 }
             }
         )
@@ -932,6 +1096,7 @@ fun CookModeScreen(
             onDismiss = { viewModel.hidePostCookDialog() },
             onConfirm = { status, rating, note ->
                 viewModel.finishCooking(status, rating, note) {
+                    com.aetnox.cooking.ui.util.ActiveCookingManager.clearSession(context, recipe.id)
                     onNavigateBack()
                 }
             }
@@ -1011,8 +1176,9 @@ fun StepTextWithBadges(
                             ingredientName = firstIng.name,
                             customGramsPerUnit = firstIng.gramsPerUnit
                         )
+                        val displayUnit = UnitConverter.formatUnitForDisplay(firstIng.selectedUnit)
                         if (amtStr.isNotEmpty()) {
-                            "$checkPrefix${firstIng.name} ($amtStr ${firstIng.selectedUnit})"
+                            "$checkPrefix${firstIng.name} ($amtStr $displayUnit)"
                         } else {
                             "$checkPrefix${firstIng.name}"
                         }
@@ -1087,6 +1253,7 @@ fun IngredientChecklistItem(
         ingredientName = ingredient.name,
         customGramsPerUnit = ingredient.gramsPerUnit
     )
+    val displayUnit = UnitConverter.formatUnitForDisplay(ingredient.selectedUnit)
 
     Card(
         modifier = Modifier
@@ -1148,7 +1315,7 @@ fun IngredientChecklistItem(
                         modifier = Modifier.clickable { showUnitMenu = true }
                     ) {
                         Text(
-                            text = "$formattedAmount ${ingredient.selectedUnit}",
+                            text = "$formattedAmount $displayUnit",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None,
@@ -1158,11 +1325,13 @@ fun IngredientChecklistItem(
                         )
                     }
 
-                    val availableUnits = remember(ingredient.unit, ingredient.name, ingredient.gramsPerUnit) {
-                        UnitConverter.SUPPORTED_UNITS.filter { targetUnit ->
+                    val availableUnits = remember(ingredient.unit, ingredient.name, ingredient.gramsPerUnit, AppLocaleManager.isEnglish) {
+                        val supported = UnitConverter.getSupportedUnits()
+                        supported.filter { targetUnit ->
+                            val normTarget = UnitConverter.normalizeUnit(targetUnit)
                             UnitConverter.canConvert(
                                 fromUnit = ingredient.unit,
-                                toUnit = targetUnit,
+                                toUnit = normTarget,
                                 ingredientName = ingredient.name,
                                 customGramsPerUnit = ingredient.gramsPerUnit
                             )
@@ -1177,7 +1346,8 @@ fun IngredientChecklistItem(
                             DropdownMenuItem(
                                 text = { Text(targetUnit) },
                                 onClick = {
-                                    onSelectUnit(targetUnit)
+                                    val normUnit = UnitConverter.normalizeUnit(targetUnit)
+                                    onSelectUnit(normUnit)
                                     showUnitMenu = false
                                 }
                             )
@@ -1204,6 +1374,7 @@ fun StepCardWithBadges(
     onSelectStep: () -> Unit = {},
     onStartOrPauseTimer: (Int) -> Unit = {},
     onResetTimer: () -> Unit = {},
+    onAddTimeToTimer: (Int) -> Unit = {},
     onToggleIngredientCheck: (Long) -> Unit = {},
     onSelectMedia: (String) -> Unit = {}
 ) {
@@ -1213,7 +1384,7 @@ fun StepCardWithBadges(
     val stepImages = remember(imageUrisJson) {
         try {
             kotlinx.serialization.json.Json.decodeFromString<List<String>>(imageUrisJson)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -1239,7 +1410,7 @@ fun StepCardWithBadges(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "$stepNumber",
+                        text = stepNumber.toString(),
                         color = if (isActiveStep) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondary,
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.labelMedium
@@ -1283,6 +1454,7 @@ fun StepCardWithBadges(
                             val badgeText = if (matchedIngs.isNotEmpty()) {
                                 val firstIng = matchedIngs.first()
                                 val checkPrefix = if (isChecked) "✓ " else ""
+                                val displayUnit = UnitConverter.formatUnitForDisplay(firstIng.selectedUnit)
                                 if (matchedIngs.size == 1) {
                                     val amtStr = UnitConverter.scaleAndFormatAmount(
                                         amount = firstIng.amount,
@@ -1299,7 +1471,7 @@ fun StepCardWithBadges(
                                         firstIng.name
                                     }
                                     if (amtStr.isNotEmpty()) {
-                                        "$checkPrefix$displayName ($amtStr ${firstIng.selectedUnit})"
+                                        "$checkPrefix$displayName ($amtStr $displayUnit)"
                                     } else {
                                         "$checkPrefix$displayName"
                                     }
@@ -1314,7 +1486,8 @@ fun StepCardWithBadges(
                                             ingredientName = ing.name,
                                             customGramsPerUnit = ing.gramsPerUnit
                                         )
-                                        if (amt.isNotEmpty()) "$amt ${ing.selectedUnit}" else null
+                                        val u = UnitConverter.formatUnitForDisplay(ing.selectedUnit)
+                                        if (amt.isNotEmpty()) "$amt $u" else null
                                     }
                                     if (amtStrList.isNotEmpty()) {
                                         "$checkPrefix${firstIng.name} (${amtStrList.joinToString(" + ")})"
@@ -1361,10 +1534,7 @@ fun StepCardWithBadges(
                     isFinished = timerState?.isFinished == true,
                     onStartPause = { onStartOrPauseTimer(durationToUse) },
                     onReset = onResetTimer,
-                    onAddSeconds = { addSecs ->
-                        val curr = timerState?.secondsRemaining ?: durationToUse
-                        onStartOrPauseTimer(curr + addSecs)
-                    }
+                    onAddSeconds = { addSecs -> onAddTimeToTimer(addSecs) }
                 )
             }
 
@@ -1372,7 +1542,7 @@ fun StepCardWithBadges(
             if (stepImages.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(stepImages) { uriStr ->
+                    items(stepImages, key = { it }) { uriStr ->
                         val isVideo = MediaViewerUtils.isVideoUri(uriStr, context)
                         Box(
                             modifier = Modifier
@@ -1396,7 +1566,7 @@ fun StepCardWithBadges(
                                 ) {
                                     Icon(
                                         Icons.Default.PlayArrow,
-                                        contentDescription = "Видео",
+                                        contentDescription = AppLocaleManager.tr("Видео", "Video"),
                                         tint = Color.White
                                     )
                                 }
@@ -1418,20 +1588,27 @@ fun PostCookDialog(
     onConfirm: (status: String, rating: Int, postCookNote: String) -> Unit
 ) {
     var selectedStatus by remember { mutableStateOf(currentStatus) }
+    var selectedRating by remember { mutableIntStateOf(currentRating) }
     var note by remember { mutableStateOf(currentPostNote) }
 
-    val statusOptions = listOf(
-        RecipeEntity.STATUS_VERIFIED to "Проверено (Отличный рецепт)",
-        RecipeEntity.STATUS_NEEDS_WORK to "Работа над ошибками",
-        RecipeEntity.STATUS_ARCHIVED to "Архив"
-    )
+    val statusOptions = remember {
+        listOf(
+            RecipeEntity.STATUS_VERIFIED to AppLocaleManager.tr("Проверено (Отличный рецепт)", "Verified (Great recipe)"),
+            RecipeEntity.STATUS_NEEDS_WORK to AppLocaleManager.tr("Работа над ошибками", "Needs work"),
+            RecipeEntity.STATUS_ARCHIVED to AppLocaleManager.tr("Архив", "Archive")
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Приготовление завершено!", fontWeight = FontWeight.Bold) },
+        properties = DialogProperties(decorFitsSystemWindows = false),
+        title = { Text(AppLocaleManager.tr("🎉 Приготовление завершено!", "🎉 Cooking Completed!"), fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Выберите итоговый статус рецепта:", fontWeight = FontWeight.SemiBold)
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(AppLocaleManager.tr("Выберите итоговый статус рецепта:", "Select final recipe status:"), fontWeight = FontWeight.SemiBold)
 
                 statusOptions.forEach { (statusKey, label) ->
                     Row(
@@ -1451,51 +1628,34 @@ fun PostCookDialog(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
+                Text(AppLocaleManager.tr("Оценка блюда:", "Rate dish:"), fontWeight = FontWeight.SemiBold)
+
+                StarRatingBar(
+                    rating = selectedRating,
+                    onRatingChanged = { selectedRating = it },
+                    starSize = 28
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Заметка по результату (что изменить на будущее)") },
+                    label = { Text(AppLocaleManager.tr("Заметка по результату (что изменить на будущее)", "Post-cook note (what to improve next time)")) },
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 4
                 )
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(selectedStatus, 0, note) }) {
-                Text("Сохранить результат")
+            Button(onClick = { onConfirm(selectedStatus, selectedRating, note) }) {
+                Text(AppLocaleManager.tr("Сохранить результат", "Save result"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Отмена")
+                Text(AppLocaleManager.tr("Отмена", "Cancel"))
             }
         }
     )
-}
-
-@SuppressLint("MissingPermission")
-private fun playTimerCompletionAlert(context: Context) {
-    try {
-        val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val ringtone = RingtoneManager.getRingtone(context, alarmUri)
-        ringtone?.play()
-
-        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            vibratorManager?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400), -1))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator?.vibrate(longArrayOf(0, 400, 200, 400), -1)
-        }
-    } catch (e: Exception) {
-        // Safe fallback
-    }
 }

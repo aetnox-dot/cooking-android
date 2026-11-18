@@ -57,7 +57,8 @@ object MediaViewerUtils {
                 setDataAndType(uri, if (isVideo) "video/*" else "image/*")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(intent, if (isVideo) "Воспроизвести видео" else "Просмотр фото"))
+            val title = if (isVideo) AppLocaleManager.tr("Воспроизвести видео", "Play video") else AppLocaleManager.tr("Просмотр фото", "View photo")
+            context.startActivity(Intent.createChooser(intent, title))
         } catch (e: Exception) {
             // handle error
         }
@@ -154,7 +155,7 @@ fun FullscreenMediaDialog(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Закрыть",
+                    contentDescription = AppLocaleManager.tr("Закрыть", "Close"),
                     tint = Color.White
                 )
             }

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cooking</string>
+    <string name="nav_back">Back</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="search_placeholder">Search by title or ingredients&#8230;</string>
+    <string name="cook_mode_title">Cooking Mode</string>
+    <string name="ai_assistant">AI Assistant</string>
+    <string name="ingredients">Ingredients</string>
+    <string name="steps">Cooking Steps</string>
+    <string name="settings">Settings</string>
+    <string name="onboarding_title">Cooking Assistant</string>
+    <string name="timer_channel_name">Cooking Timers</string>
+    <string name="timer_channel_desc">Notifications when cooking timers complete</string>
+    <string name="timer_completed_title">⏱️ Timer completed!</string>
+    <string name="timer_add_min">+1 min</string>
+    <string name="timer_reset">Reset</string>
+</resources>

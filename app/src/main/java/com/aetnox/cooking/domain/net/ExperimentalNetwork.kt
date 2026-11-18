@@ -30,9 +30,10 @@ enum class AssistantThinkingMode(val label: String, val budget: Int) {
 data class ExperimentalNetworkSettings(
     val dnsMode: DnsMode = DnsMode.OFF,
     val customDnsUrl: String = "",
-    val cookAssistantEnabled: Boolean = false,
+    val cookAssistantEnabled: Boolean = true,
     val assistantThinkingMode: AssistantThinkingMode = AssistantThinkingMode.OFF,
-    val aiDisabled: Boolean = false
+    val aiDisabled: Boolean = false,
+    val densityHintsEnabled: Boolean = false
 )
 
 object ExperimentalSettingsManager {
@@ -42,6 +43,7 @@ object ExperimentalSettingsManager {
     private const val KEY_COOK_ASSISTANT = "experimental_cook_assistant"
     private const val KEY_ASSISTANT_THINKING = "experimental_assistant_thinking"
     private const val KEY_AI_DISABLED = "experimental_ai_disabled"
+    private const val KEY_DENSITY_HINTS = "experimental_density_hints"
 
     // Важно: URL с IP-литералом вместо домена — иначе для разрешения
     // адреса DoH-сервера нужен сам DNS, который мы как раз чиним (bootstrap-петля).
@@ -63,12 +65,19 @@ object ExperimentalSettingsManager {
         return ExperimentalNetworkSettings(
             dnsMode = mode,
             customDnsUrl = prefs.getString(KEY_DNS_CUSTOM_URL, null)?.trim().orEmpty(),
-            cookAssistantEnabled = prefs.getBoolean(KEY_COOK_ASSISTANT, false),
+            cookAssistantEnabled = prefs.getBoolean(KEY_COOK_ASSISTANT, true),
             assistantThinkingMode = prefs.getString(KEY_ASSISTANT_THINKING, null)
                 ?.let { runCatching { AssistantThinkingMode.valueOf(it) }.getOrNull() }
                 ?: AssistantThinkingMode.OFF,
-            aiDisabled = prefs.getBoolean(KEY_AI_DISABLED, false)
+            aiDisabled = prefs.getBoolean(KEY_AI_DISABLED, false),
+            densityHintsEnabled = prefs.getBoolean(KEY_DENSITY_HINTS, false)
         )
+    }
+
+    fun saveDensityHintsEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit()
+            .putBoolean(KEY_DENSITY_HINTS, enabled)
+            .apply()
     }
 
     fun saveAiDisabled(context: Context, disabled: Boolean) {

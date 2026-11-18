@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -34,6 +35,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -56,6 +59,7 @@ import com.aetnox.cooking.ui.theme.StatusArchivedColor
 import com.aetnox.cooking.ui.theme.StatusNeedsWorkColor
 import com.aetnox.cooking.ui.theme.StatusPlannedColor
 import com.aetnox.cooking.ui.theme.StatusVerifiedColor
+import com.aetnox.cooking.ui.util.AppLocaleManager
 import java.util.Locale
 
 enum class ViewMode {
@@ -68,10 +72,10 @@ fun RecipeStatusChip(
     modifier: Modifier = Modifier
 ) {
     val (color, icon, text) = when (status) {
-        RecipeEntity.STATUS_PLANNED -> Triple(StatusPlannedColor, Icons.Default.HourglassTop, "В планах")
-        RecipeEntity.STATUS_VERIFIED -> Triple(StatusVerifiedColor, Icons.Default.CheckCircle, "Проверено")
-        RecipeEntity.STATUS_NEEDS_WORK -> Triple(StatusNeedsWorkColor, Icons.Default.Build, "Над ошибками")
-        RecipeEntity.STATUS_ARCHIVED -> Triple(StatusArchivedColor, Icons.Default.Archive, "Архив")
+        RecipeEntity.STATUS_PLANNED -> Triple(StatusPlannedColor, Icons.Default.HourglassTop, AppLocaleManager.tr("В планах", "Planned"))
+        RecipeEntity.STATUS_VERIFIED -> Triple(StatusVerifiedColor, Icons.Default.CheckCircle, AppLocaleManager.tr("Проверено", "Verified"))
+        RecipeEntity.STATUS_NEEDS_WORK -> Triple(StatusNeedsWorkColor, Icons.Default.Build, AppLocaleManager.tr("Над ошибками", "Needs work"))
+        RecipeEntity.STATUS_ARCHIVED -> Triple(StatusArchivedColor, Icons.Default.Archive, AppLocaleManager.tr("Архив", "Archive"))
         else -> Triple(MaterialTheme.colorScheme.primary, Icons.Default.CheckCircle, status)
     }
 
@@ -118,7 +122,7 @@ fun TimeAndCountBadge(
                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
             ) {
                 Text(
-                    text = "⏱ $totalMinutes мин",
+                    text = "⏱ $totalMinutes ${AppLocaleManager.tr("мин", "min")}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     fontWeight = FontWeight.Medium,
@@ -133,7 +137,7 @@ fun TimeAndCountBadge(
                 color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
             ) {
                 Text(
-                    text = "🛒 $ingredientsCount ингред.",
+                    text = "🛒 $ingredientsCount ${AppLocaleManager.tr("ингред.", "ingred.")}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                     fontWeight = FontWeight.Medium,
@@ -164,7 +168,7 @@ fun StarRatingBar(
             ) {
                 Icon(
                     imageVector = if (isSelected) Icons.Default.Star else Icons.Outlined.Star,
-                    contentDescription = "$starIndex звезд",
+                    contentDescription = "$starIndex ${AppLocaleManager.tr("звезд", "stars")}",
                     tint = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.size(starSize.dp)
                 )
@@ -278,7 +282,7 @@ fun ViewModeToggle(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ViewList,
-                    contentDescription = "Список",
+                    contentDescription = AppLocaleManager.tr("Список", "List"),
                     tint = if (currentMode == ViewMode.LIST) MaterialTheme.colorScheme.onPrimaryContainer
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
@@ -297,7 +301,7 @@ fun ViewModeToggle(
             ) {
                 Icon(
                     imageVector = Icons.Default.GridView,
-                    contentDescription = "Сетка",
+                    contentDescription = AppLocaleManager.tr("Сетка", "Grid"),
                     tint = if (currentMode == ViewMode.GRID) MaterialTheme.colorScheme.onPrimaryContainer
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
@@ -359,7 +363,7 @@ fun StepTimerCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isFinished) "🔔 ТАЙМЕР ЗАВЕРШЁН!" else if (isRunning) "⏱ ИДЁТ ОТСЧЁТ..." else "⏱ ТАЙМЕР",
+                    text = if (isFinished) AppLocaleManager.tr("🔔 ТАЙМЕР ЗАВЕРШЁН!", "🔔 TIMER COMPLETED!") else if (isRunning) AppLocaleManager.tr("⏱ ИДЁТ ОТСЧЁТ...", "⏱ COUNTING DOWN...") else AppLocaleManager.tr("⏱ ТАЙМЕР", "⏱ TIMER"),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = textColor
@@ -371,14 +375,14 @@ fun StepTimerCard(
                         shape = CircleShape,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                     ) {
-                        Text("+1 мин", style = MaterialTheme.typography.labelSmall)
+                        Text(AppLocaleManager.tr("+1 мин", "+1 min"), style = MaterialTheme.typography.labelSmall)
                     }
                     OutlinedButton(
                         onClick = { onAddSeconds(300) },
                         shape = CircleShape,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                     ) {
-                        Text("+5 мин", style = MaterialTheme.typography.labelSmall)
+                        Text(AppLocaleManager.tr("+5 мин", "+5 min"), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -398,26 +402,41 @@ fun StepTimerCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                FilledTonalButton(
-                    onClick = onStartPause,
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (isRunning) "Пауза" else if (isFinished) "Старт снова" else "Старт")
-                }
+                if (isFinished) {
+                    Button(
+                        onClick = onReset,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(AppLocaleManager.tr("Готово (Сбросить)", "Done (Reset)"), fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    FilledTonalButton(
+                        onClick = onStartPause,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isRunning) AppLocaleManager.tr("Пауза", "Pause") else AppLocaleManager.tr("Старт", "Start"))
+                    }
 
-                IconButton(
-                    onClick = onReset,
-                    modifier = Modifier.background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Сброс"
-                    )
+                    IconButton(
+                        onClick = onReset,
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = AppLocaleManager.tr("Сброс", "Reset")
+                        )
+                    }
                 }
             }
         }

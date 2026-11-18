@@ -46,6 +46,18 @@ interface RecipeDao {
     @Query("DELETE FROM recipes WHERE id = :id")
     suspend fun deleteRecipeById(id: Long)
 
+    @Query("UPDATE recipes SET is_favorite = :isFavorite, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateFavoriteStatus(id: Long, isFavorite: Boolean, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE recipes SET is_in_cart = :isInCart, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateCartStatus(id: Long, isInCart: Boolean, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE recipes SET is_in_cart = 0, updatedAt = :updatedAt WHERE is_in_cart = 1")
+    suspend fun clearAllCartRecipes(updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE recipes SET cloudId = :cloudId, cloudAccessCode = :cloudAccessCode WHERE id = :id")
+    suspend fun updateCloudInfo(id: Long, cloudId: String?, cloudAccessCode: String?)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertIngredients(ingredients: List<IngredientEntity>)
 

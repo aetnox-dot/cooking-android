@@ -47,23 +47,58 @@ object CookAssistantTools {
 
     /** Ищет строку «TOOL: ...» в ответе модели. Остальной текст в этой итерации игнорируем. */
     fun parseToolCall(reply: String): ToolCall? {
+        if (reply.isBlank()) return null
+
         val line = reply.lineSequence()
             .map { it.trim() }
-            .firstOrNull { it.startsWith("TOOL:", ignoreCase = true) }
+            .firstOrNull { it.contains("TOOL:", ignoreCase = true) }
             ?: return null
 
-        val body = line.substringAfter(':').trim()
+        val body = line.substringAfter("TOOL:", "").ifBlank { line.substringAfter("tool:", "") }.trim()
         if (body.isBlank()) return null
 
-        val name = body.substringBefore('|').trim().lowercase()
-        val arg = if ('|' in body) body.substringAfter('|').trim() else ""
-        if (name.isEmpty()) return null
+        // Separate action name and argument string cleanly
+        val firstSepIdx = body.indexOfAny(charArrayOf(':', '|'))
+        var rawName = (if (firstSepIdx != -1) body.substring(0, firstSepIdx) else body.substringBefore(' ')).trim().lowercase()
+        var rawArg = (if (firstSepIdx != -1) body.substring(firstSepIdx + 1) else if (body.contains(' ')) body.substringAfter(' ') else "").trim().removePrefix("|").removePrefix(":").trim()
 
-        return ToolCall(name, arg)
+        // Extract trailing digits if embedded in name, e.g. "go_to_step_3" -> name="go_to_step", arg="3"
+        val trailingDigitMatch = Regex("""^([a-z_]+?)_?(\d+)$""").find(rawName)
+        if ((trailingDigitMatch != null) && rawArg.isBlank()) {
+            rawName = trailingDigitMatch.groupValues[1].trimEnd('_')
+            rawArg = trailingDigitMatch.groupValues[2]
+        }
+
+        // Normalize tool name aliases
+        val normalizedName = when (rawName) {
+            "get_steps", "get_all_step", "get_step_all", "all_steps", "steps" -> "get_all_steps"
+            "get_ingredient", "ingredients", "ingredient", "get_all_ingredients" -> "get_ingredients"
+            "get_note", "notes", "note" -> "get_notes"
+            "raw_notes", "raw_note" -> "get_raw_notes"
+            "chef_sheet", "get_chef", "chef", "chef_info" -> "get_chef_sheet"
+            "nutrition", "get_kbzhu", "kbzhu", "calories", "get_calories" -> "get_nutrition"
+            "next_step", "step_next", "go_next" -> {
+                if (rawArg.isBlank()) rawArg = "next"
+                "go_to_step"
+            }
+            "prev_step", "previous_step", "step_prev", "go_prev" -> {
+                if (rawArg.isBlank()) rawArg = "prev"
+                "go_to_step"
+            }
+            "set_timer", "add_timer", "timer", "create_timer" -> "suggest_timer"
+            else -> rawName
+        }
+
+        return ToolCall(normalizedName, rawArg)
     }
 
     /** Локальное выполнение инструмента — без сети и без токенов. */
-    fun execute(call: ToolCall, details: RecipeWithDetails, currentServings: Double): ToolResult {
+    fun execute(
+        call: ToolCall,
+        details: RecipeWithDetails,
+        currentServings: Double,
+        activeStepIndex: Int = 1
+    ): ToolResult {
         val recipe = details.recipe
         val steps = details.steps.sortedBy { it.stepNumber }
 
@@ -150,9 +185,17 @@ object CookAssistantTools {
             }
 
             "go_to_step" -> {
-                val n = call.arg.toIntOrNull()
-                if (n != null && n in 1..steps.size) {
-                    ToolResult("Экран перелистан к шагу $n.", newStepIndex = n)
+                val argLower = call.arg.lowercase().trim()
+                val targetStep = when {
+                    argLower == "next" || argLower.contains("следующ") || argLower.contains("вперед") ->
+                        (activeStepIndex + 1).coerceAtMost(steps.size)
+                    argLower == "prev" || argLower.contains("предыдущ") || argLower.contains("назад") ->
+                        (activeStepIndex - 1).coerceAtLeast(1)
+                    else -> call.arg.toIntOrNull()
+                }
+
+                if (targetStep != null && targetStep in 1..steps.size) {
+                    ToolResult("Экран перелистан к шагу $targetStep.", newStepIndex = targetStep)
                 } else {
                     ToolResult("Ошибка: шага '${call.arg}' нет. Всего шагов: ${steps.size}.")
                 }
@@ -167,7 +210,7 @@ object CookAssistantTools {
                     ?: timeStr.toIntOrNull()?.let { if (it < 60) it * 60 else it }
 
                 if (parsedSec == null || parsedSec <= 0) {
-                    ToolResult("Ошибка: не удалось распознать время '${timeStr}'. Укажите время, например: 5 минут, 30 сек.")
+                    ToolResult("Ошибка: не удалось распознать время '$timeStr'. Укажите время, например: 5 минут, 30 сек.")
                 } else {
                     val formatted = com.aetnox.cooking.ui.viewmodel.StepTimerParser.formatTime(parsedSec)
                     ToolResult(
@@ -232,6 +275,6 @@ object CookAssistantTools {
     }
 
     private fun cleanStepText(text: String): String {
-        return text.replace(Regex("""@\[([^\]]+)\]"""), "$1")
+        return text.replace(Regex("""@\[([^]]+)\]"""), "$1")
     }
 }

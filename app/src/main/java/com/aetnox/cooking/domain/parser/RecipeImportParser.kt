@@ -40,7 +40,7 @@ private data class JsonIngredientModel(
     val unit: String? = null,
     val note: String? = null,
     val groupName: String? = null,
-    val group_name: String? = null,
+    @kotlinx.serialization.SerialName("group_name") val groupNameSnakeCase: String? = null,
     val group: String? = null,
     val section: String? = null,
     val category: String? = null
@@ -76,7 +76,7 @@ object RecipeImportParser {
             try {
                 val jsonModel = json.decodeFromString<JsonImportModel>(trimmed)
                 return convertJsonModel(jsonModel)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Fallback to text parsing
             }
         }
@@ -117,7 +117,7 @@ object RecipeImportParser {
                 ing.note?.ifBlank { null },
                 noteStr?.ifBlank { null }
             ).joinToString("; ")
-            val group = ing.groupName ?: ing.group_name ?: ing.group ?: ing.section ?: ing.category ?: ""
+            val group = ing.groupName ?: ing.groupNameSnakeCase ?: ing.group ?: ing.section ?: ing.category ?: ""
 
             IngredientEntity(
                 recipeId = 0,
@@ -225,7 +225,7 @@ object RecipeImportParser {
                     }
                 }
                 "STEPS" -> {
-                    val cleanStep = trimmedLine.replaceFirst(Regex("""^(\d+[\.\)]|-|\*|📌)\s*"""), "")
+                    val cleanStep = trimmedLine.replaceFirst(Regex("""^(\d+[.)]|-|\*|📌)\s*"""), "")
                     if (cleanStep.isNotEmpty()) {
                         steps.add(
                             StepEntity(
@@ -311,9 +311,47 @@ object RecipeImportParser {
         )
     }
 
+    data class ParsedAmountUnit(
+        val amount: Double,
+        val unit: String?,
+        val extraNote: String?
+    )
+
+    fun parseAmountAndUnit(rawStr: String, baseAmount: Double = 0.0): ParsedAmountUnit {
+        val clean = rawStr.trim().replace(',', '.')
+        if (clean.isEmpty()) return ParsedAmountUnit(0.0, null, null)
+
+        val lower = clean.lowercase()
+        val isDecrease = lower.contains("меньше") || lower.contains("минус") || lower.contains("уменьш")
+        val isIncrease = lower.contains("больше") || lower.contains("плюс") || lower.contains("увелич")
+
+        val numMatchInRelative = Regex("""(\d+(?:\.\d+)?)""").find(clean)
+        val extractedVal = numMatchInRelative?.groupValues?.get(1)?.toDoubleOrNull()
+
+        if ((isDecrease || isIncrease) && extractedVal != null && baseAmount > 0.0) {
+            val delta = if (isDecrease) -extractedVal else extractedVal
+            val calculatedAmount = maxOf(0.0, baseAmount + delta)
+            val unitPart = clean.replace(Regex("""(?i)(на|меньше|больше|минус|плюс|уменьшить|увеличить|\d+(?:\.\d+)?)"""), "").trim().ifBlank { null }
+            return ParsedAmountUnit(calculatedAmount, unitPart, null)
+        }
+
+        val match = Regex("""^(\d+(?:\.\d+)?|\d+\s+\d+/\d+|\d+/\d+)\s*(.*)$""").find(clean)
+        if (match != null) {
+            val numPart = match.groupValues[1]
+            val unitPart = match.groupValues[2].trim().ifBlank { null }
+            val (num, note) = parseSafeAmount(numPart)
+            if (num > 0.0 || numPart == "0") {
+                return ParsedAmountUnit(num, unitPart, note)
+            }
+        }
+
+        val (num, note) = parseSafeAmount(clean)
+        return ParsedAmountUnit(num, null, note)
+    }
+
     /**
      * Safely converts amount string to Double (supporting mixed fractions like "1 1/2",
-     * simple fractions like "1/2", and ranges like "2-3").
+     * simple fractions like "1/2", ranges like "2-3", and trailing unit strings like "210 мл").
      * Non-numeric strings are returned as note remark.
      */
     fun parseSafeAmount(rawStr: String): Pair<Double, String?> {
@@ -321,7 +359,7 @@ object RecipeImportParser {
         if (clean.isEmpty()) return Pair(0.0, null)
 
         // Range amounts like "2-3" or "2–3"
-        val rangeMatch = Regex("""^(\d+(?:\.\d+)?)\s*[\-–—]\s*(\d+(?:\.\d+)?)$""").find(clean)
+        val rangeMatch = Regex("""^(\d+(?:\.\d+)?)\s*[\-–—]\s*(\d+(?:\.\d+)?)(?:\s*(.*))?$""").find(clean)
         if (rangeMatch != null) {
             val first = rangeMatch.groupValues[1].toDoubleOrNull()
             val second = rangeMatch.groupValues[2].toDoubleOrNull()
@@ -332,7 +370,7 @@ object RecipeImportParser {
         }
 
         // Mixed fraction like "1 1/2"
-        val mixedMatch = Regex("""^(\d+)\s+(\d+)/(\d+)$""").find(clean)
+        val mixedMatch = Regex("""^(\d+)\s+(\d+)/(\d+)(?:\s*(.*))?$""").find(clean)
         if (mixedMatch != null) {
             val whole = mixedMatch.groupValues[1].toDoubleOrNull() ?: 0.0
             val num = mixedMatch.groupValues[2].toDoubleOrNull() ?: 0.0
@@ -343,14 +381,21 @@ object RecipeImportParser {
         }
 
         // Simple fraction like "1/2", "3/4"
-        if (clean.contains("/")) {
-            val parts = clean.split("/")
-            if (parts.size == 2) {
-                val num = parts[0].trim().toDoubleOrNull()
-                val den = parts[1].trim().toDoubleOrNull()
-                if (num != null && den != null && den != 0.0) {
-                    return Pair(num / den, null)
-                }
+        val fracMatch = Regex("""^(\d+)/(\d+)(?:\s*(.*))?$""").find(clean)
+        if (fracMatch != null) {
+            val num = fracMatch.groupValues[1].toDoubleOrNull()
+            val den = fracMatch.groupValues[2].toDoubleOrNull()
+            if (num != null && den != null && den != 0.0) {
+                return Pair(num / den, null)
+            }
+        }
+
+        // Leading number with optional trailing unit string, e.g. "210 мл", "210г", "1.5 л"
+        val numMatch = Regex("""^(\d+(?:\.\d+)?)(?:\s*(.*))?$""").find(clean)
+        if (numMatch != null) {
+            val parsed = numMatch.groupValues[1].toDoubleOrNull()
+            if (parsed != null) {
+                return Pair(parsed, null)
             }
         }
 

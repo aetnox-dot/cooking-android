@@ -51,33 +51,68 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.aetnox.cooking.ui.util.AppLocaleManager
 import kotlinx.coroutines.delay
 
-private data class ProgressPhase(
+private data class ProgressStage(
     val iconEmoji: String,
-    val title: String,
-    val detail: String
-)
-
-private fun getPhaseForPercent(percent: Int): ProgressPhase {
-    return when {
-        percent < 100 -> ProgressPhase(
-            iconEmoji = "📡",
-            title = "Ожидание ответа от ИИ-сервера...",
-            detail = "Передача структуры рецепта и обработка (10%)"
-        )
-        else -> ProgressPhase(
-            iconEmoji = "✅",
-            title = "Готово!",
-            detail = "Поля рецепта успешно структурированы"
-        )
-    }
+    val ruTitle: String,
+    val enTitle: String,
+    val ruDetail: String,
+    val enDetail: String,
+    val startPercent: Int,
+    val endPercent: Int
+) {
+    val title: String get() = AppLocaleManager.tr(ruTitle, enTitle)
+    val detail: String get() = AppLocaleManager.tr(ruDetail, enDetail)
 }
 
-private val CULINARY_TIPS = listOf(
-    "💡 Совет: Встроенные таймеры в шагах активируются в 1 клик в режиме готовки!",
-    "💡 Совет: Шеф-Помощник автоматически разбивает продукты по категориям.",
-    "💡 Совет: В режиме готовки экран смартфона автоматически остается включенным!"
+private val STAGES = listOf(
+    ProgressStage(
+        iconEmoji = "📡",
+        ruTitle = "Подключение к Шеф-ИИ...",
+        enTitle = "Connecting to Chef AI...",
+        ruDetail = "Передача запроса и данных рецепта",
+        enDetail = "Sending request and recipe details",
+        startPercent = 0,
+        endPercent = 25
+    ),
+    ProgressStage(
+        iconEmoji = "🧠",
+        ruTitle = "Анализ рецепта и ингредиентов...",
+        enTitle = "Analyzing recipe & ingredients...",
+        ruDetail = "Распознавание продуктов, единиц и дозировок",
+        enDetail = "Parsing products, units and quantities",
+        startPercent = 25,
+        endPercent = 55
+    ),
+    ProgressStage(
+        iconEmoji = "⏱️",
+        ruTitle = "Формирование шагов и таймеров...",
+        enTitle = "Generating steps & timers...",
+        ruDetail = "Расчет порядка готовки и времени",
+        enDetail = "Calculating cooking order and time",
+        startPercent = 55,
+        endPercent = 80
+    ),
+    ProgressStage(
+        iconEmoji = "✨",
+        ruTitle = "Финализация структуры рецепта...",
+        enTitle = "Finalizing recipe structure...",
+        ruDetail = "Упаковка рецепта в карточку блюда",
+        enDetail = "Packaging recipe into dish card",
+        startPercent = 80,
+        endPercent = 95
+    ),
+    ProgressStage(
+        iconEmoji = "✅",
+        ruTitle = "Готово!",
+        enTitle = "Done!",
+        ruDetail = "Поля рецепта успешно структурированы!",
+        enDetail = "Recipe fields successfully structured!",
+        startPercent = 100,
+        endPercent = 100
+    )
 )
 
 @Composable
@@ -85,32 +120,81 @@ fun AiGenerationProgressBox(
     modifier: Modifier = Modifier,
     isCompleted: Boolean = false
 ) {
+    var stageIndex by remember { mutableIntStateOf(0) }
     var percent by remember { mutableIntStateOf(0) }
+    var tipIndex by remember { mutableIntStateOf(0) }
 
-    // Instant rapid completion when AI response arrives!
+    val culinaryTips = remember {
+        listOf(
+            AppLocaleManager.tr("💡 Совет: Встроенные таймеры в шагах активируются в 1 клик в режиме готовки!", "💡 Tip: Built-in timers in steps are activated in 1 click in cooking mode!"),
+            AppLocaleManager.tr("💡 Совет: Шеф-Помощник автоматически разбивает продукты по категориям.", "💡 Tip: Chef Assistant automatically categorizes products into sections."),
+            AppLocaleManager.tr("💡 Совет: В режиме готовки экран смартфона автоматически остается включенным!", "💡 Tip: In cooking mode, your smartphone screen stays on automatically!"),
+            AppLocaleManager.tr("💡 Совет: Вы можете делиться своими рецептами через облачный код доступа.", "💡 Tip: You can share your recipes via cloud access code.")
+        )
+    }
+
+    // Smooth stage progression with readable display time per phase (>= 1000ms per stage)
+    LaunchedEffect(isCompleted) {
+        if (!isCompleted) {
+            // Stage 0: 0 -> 25%
+            stageIndex = 0
+            for (p in STAGES[0].startPercent..STAGES[0].endPercent) {
+                percent = p
+                delay(35L)
+            }
+            delay(800L) // Guarantee stage 0 stays visible long enough to read
+
+            // Stage 1: 25 -> 55%
+            stageIndex = 1
+            for (p in STAGES[1].startPercent..STAGES[1].endPercent) {
+                percent = p
+                delay(35L)
+            }
+            delay(1000L) // Guarantee stage 1 stays visible
+
+            // Stage 2: 55 -> 80%
+            stageIndex = 2
+            for (p in STAGES[2].startPercent..STAGES[2].endPercent) {
+                percent = p
+                delay(35L)
+            }
+            delay(1000L) // Guarantee stage 2 stays visible
+
+            // Stage 3: 80 -> 95%
+            stageIndex = 3
+            for (p in STAGES[3].startPercent..STAGES[3].endPercent) {
+                percent = p
+                delay(40L)
+            }
+        } else {
+            // Transition smoothly to completion
+            percent = 100
+            stageIndex = 4
+        }
+    }
+
+    // Completion handler
     LaunchedEffect(isCompleted) {
         if (isCompleted) {
             percent = 100
+            stageIndex = 4
         }
     }
 
+    // Rotate culinary tips periodically
     LaunchedEffect(isCompleted) {
-        if (isCompleted) return@LaunchedEffect
-
-        // Tick 0 -> 10% and HOLD strictly at 10% until isCompleted becomes true!
-        while (percent < 10 && !isCompleted) {
-            delay(80)
-            percent++
+        while (!isCompleted) {
+            delay(3500L)
+            tipIndex = (tipIndex + 1) % culinaryTips.size
         }
-        percent = 10
     }
 
-    val currentPhase = getPhaseForPercent(percent)
+    val currentStage = STAGES.getOrElse(stageIndex) { STAGES.first() }
 
     val animatedProgress by animateFloatAsState(
         targetValue = percent / 100f,
         animationSpec = tween(
-            durationMillis = if (percent == 100) 200 else 400,
+            durationMillis = 300,
             easing = FastOutSlowInEasing
         ),
         label = "progressAnimation"
@@ -137,7 +221,7 @@ fun AiGenerationProgressBox(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Pulsing Holographic Glow Icon
+            // Pulsing Glow Icon
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -161,15 +245,15 @@ fun AiGenerationProgressBox(
                 )
             }
 
-            // Animated Status Text
+            // Animated Status Text (only animates when stageIndex changes, avoiding flickering!)
             AnimatedContent(
-                targetState = currentPhase,
+                targetState = currentStage,
                 transitionSpec = {
                     (slideInVertically { height -> height } + fadeIn()) togetherWith
                             (slideOutVertically { height -> -height } + fadeOut())
                 },
                 label = "statusTransition"
-            ) { phase ->
+            ) { stage ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -179,12 +263,12 @@ fun AiGenerationProgressBox(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = phase.iconEmoji,
+                            text = stage.iconEmoji,
                             style = MaterialTheme.typography.titleLarge
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = phase.title,
+                            text = stage.title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -193,7 +277,7 @@ fun AiGenerationProgressBox(
                     }
 
                     Text(
-                        text = phase.detail,
+                        text = stage.detail,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -202,7 +286,7 @@ fun AiGenerationProgressBox(
                 }
             }
 
-            // Progress Bar
+            // Progress Bar & Percentage
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -224,7 +308,7 @@ fun AiGenerationProgressBox(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = if (percent == 100) "Завершено!" else "Шеф-Помощник в процессе...",
+                        text = if (percent == 100) AppLocaleManager.tr("Завершено!", "Completed!") else AppLocaleManager.tr("Шеф-Помощник в процессе...", "Chef Assistant in progress..."),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -254,7 +338,7 @@ fun AiGenerationProgressBox(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = CULINARY_TIPS[(percent / 30) % CULINARY_TIPS.size],
+                        text = culinaryTips[tipIndex % culinaryTips.size],
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

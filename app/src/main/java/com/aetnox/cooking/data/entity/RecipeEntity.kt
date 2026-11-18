@@ -1,5 +1,6 @@
 package com.aetnox.cooking.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -14,6 +15,8 @@ data class RecipeEntity(
     val baseServings: Double = 4.0,
     val yieldUnit: String = "порций",
     val status: String = STATUS_PLANNED,
+    @ColumnInfo(name = "is_favorite", defaultValue = "0")
+    val isFavorite: Boolean = false,
     val rating: Int = 0,
     val postCookNote: String = "",
     val chefHeatingType: String = "",
@@ -28,6 +31,10 @@ data class RecipeEntity(
     val protein: Double? = null,
     val fat: Double? = null,
     val carbs: Double? = null,
+    val cloudId: String? = null,
+    val cloudAccessCode: String? = null,
+    @ColumnInfo(name = "is_in_cart", defaultValue = "0")
+    val isInCart: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {

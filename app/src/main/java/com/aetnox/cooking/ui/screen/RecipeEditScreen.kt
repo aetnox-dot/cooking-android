@@ -38,15 +38,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Delete
@@ -88,10 +87,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -100,7 +102,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.AnnotatedString
@@ -115,6 +116,7 @@ import com.aetnox.cooking.domain.converter.UnitConverter
 import com.aetnox.cooking.domain.net.ExperimentalSettingsManager
 import com.aetnox.cooking.domain.parser.AiPromptTemplates
 import com.aetnox.cooking.ui.component.AiGenerationProgressBox
+import com.aetnox.cooking.ui.util.AppLocaleManager
 import com.aetnox.cooking.ui.util.FullscreenMediaDialog
 import com.aetnox.cooking.ui.util.MediaViewerUtils
 import com.aetnox.cooking.ui.viewmodel.IngredientUiItem
@@ -128,7 +130,6 @@ fun RecipeEditScreen(
     onRecipeSaved: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
@@ -141,14 +142,14 @@ fun RecipeEditScreen(
     var showAddGroupDialog by remember { mutableStateOf(false) }
     var newGroupInput by remember { mutableStateOf("") }
 
-    var lastTrigger by remember { mutableStateOf(0L) }
+    var lastTrigger by remember { mutableLongStateOf(0L) }
     var showAiSuccessBanner by remember { mutableStateOf(false) }
 
     androidx.compose.runtime.LaunchedEffect(uiState.aiFillAnimationTrigger) {
         if (uiState.aiFillAnimationTrigger > 0L && uiState.aiFillAnimationTrigger != lastTrigger) {
             lastTrigger = uiState.aiFillAnimationTrigger
             showAiSuccessBanner = true
-            kotlinx.coroutines.delay(4000)
+            delay(4000)
             showAiSuccessBanner = false
         }
     }
@@ -181,33 +182,25 @@ fun RecipeEditScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (uiState.recipeId > 0) "Редактирование" else "Новый рецепт",
+                        if (uiState.recipeId > 0) AppLocaleManager.tr("Редактирование", "Edit Recipe") else AppLocaleManager.tr("Новый рецепт", "New Recipe"),
                         fontWeight = FontWeight.Bold
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppLocaleManager.tr("Назад", "Back"))
                     }
                 },
                 actions = {
                     if (!isAiDisabled) {
                         IconButton(onClick = { showGeminiDialog = true }) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = "Заполнить с помощью Шеф-Помощника", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.AutoAwesome, contentDescription = AppLocaleManager.tr("Заполнить с помощью Шеф-Помощника", "Fill with Chef Assistant"), tint = MaterialTheme.colorScheme.primary)
                         }
-                    }
-                    IconButton(onClick = {
-                        val clipText = clipboardManager.getText()?.text
-                        if (!clipText.isNullOrBlank()) {
-                            viewModel.importFromClipboardText(clipText)
-                        }
-                    }) {
-                        Icon(Icons.Default.ContentPaste, contentDescription = "Импорт из буфера")
                     }
                     Button(
                         onClick = {
                             if (!uiState.isQuickDraft && uiState.title.isBlank()) {
-                                Toast.makeText(context, "Введите название блюда!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, AppLocaleManager.tr("Введите название блюда!", "Enter recipe title!"), Toast.LENGTH_SHORT).show()
                             } else {
                                 viewModel.saveRecipe(onSaved = onRecipeSaved)
                             }
@@ -217,7 +210,7 @@ fun RecipeEditScreen(
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Сохранить")
+                        Text(AppLocaleManager.tr("Сохранить", "Save"))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -238,12 +231,12 @@ fun RecipeEditScreen(
                 Tab(
                     selected = !uiState.isQuickDraft,
                     onClick = { viewModel.setQuickDraftMode(false) },
-                    text = { Text("Визуальный редактор") }
+                    text = { Text(AppLocaleManager.tr("Визуальный редактор", "Visual Editor")) }
                 )
                 Tab(
                     selected = uiState.isQuickDraft,
                     onClick = { viewModel.setQuickDraftMode(true) },
-                    text = { Text("Быстрый черновик") }
+                    text = { Text(AppLocaleManager.tr("Быстрый черновик", "Quick Draft")) }
                 )
             }
 
@@ -257,12 +250,12 @@ fun RecipeEditScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "⚡ Быстрый черновик",
+                        text = "⚡ ${AppLocaleManager.tr("Быстрый черновик", "Quick Draft")}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Сохраняйте сырые заметки, ссылки, фото и видео на бегу. Рецепт автоматически получит статус «В планах».",
+                        text = AppLocaleManager.tr("Сохраняйте сырые заметки, ссылки, фото и видео на бегу. Рецепт автоматически получит статус «В планах».", "Save raw notes, links, photos and videos on the go. The recipe will automatically be set to 'Planned' status."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -270,7 +263,7 @@ fun RecipeEditScreen(
                     OutlinedTextField(
                         value = uiState.title,
                         onValueChange = { viewModel.updateTitle(it) },
-                        label = { Text("Название блюда (опционально)") },
+                        label = { Text(AppLocaleManager.tr("Название блюда (опционально)", "Recipe title (optional)")) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -278,7 +271,7 @@ fun RecipeEditScreen(
                     OutlinedTextField(
                         value = uiState.rawNotes,
                         onValueChange = { viewModel.updateRawNotes(it) },
-                        label = { Text("Свободные заметки / текст рецепта") },
+                        label = { Text(AppLocaleManager.tr("Свободные заметки / текст рецепта", "Free notes / recipe text")) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp),
@@ -296,13 +289,13 @@ fun RecipeEditScreen(
                     ) {
                         Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("📷 Прикрепить фото / видео из галереи")
+                        Text(AppLocaleManager.tr("📷 Прикрепить фото / видео из галереи", "📷 Attach photo / video from gallery"))
                     }
 
                     OutlinedTextField(
                         value = uiState.sourceUrl,
                         onValueChange = { viewModel.updateSourceUrl(it) },
-                        label = { Text("Ссылка на источник (URL)") },
+                        label = { Text(AppLocaleManager.tr("Ссылка на источник (URL)", "Source URL")) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -311,13 +304,13 @@ fun RecipeEditScreen(
                     if (uiState.imageUris.isNotEmpty()) {
                         Column {
                             Text(
-                                text = "Прикрепленные медиа (${uiState.imageUris.size})",
+                                text = "${AppLocaleManager.tr("Прикрепленные медиа", "Attached media")} (${uiState.imageUris.size})",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(uiState.imageUris) { uriStr ->
+                                items(uiState.imageUris, key = { it }) { uriStr ->
                                     val isVideo = MediaViewerUtils.isVideoUri(uriStr, context)
                                     Box(
                                         modifier = Modifier
@@ -341,7 +334,7 @@ fun RecipeEditScreen(
                                             ) {
                                                 Icon(
                                                     Icons.Default.PlayArrow,
-                                                    contentDescription = "Видео",
+                                                    contentDescription = AppLocaleManager.tr("Видео", "Video"),
                                                     tint = Color.White
                                                 )
                                             }
@@ -358,7 +351,7 @@ fun RecipeEditScreen(
                                         ) {
                                             Icon(
                                                 Icons.Default.Close,
-                                                contentDescription = "Удалить",
+                                                contentDescription = AppLocaleManager.tr("Удалить", "Delete"),
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -401,13 +394,13 @@ fun RecipeEditScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = "✨ Поля оцифрованы Шеф-Помощником!",
+                                        text = "✨ ${AppLocaleManager.tr("Поля оцифрованы Шеф-Помощником!", "Fields digitized by Chef Assistant!")}",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                     Text(
-                                        text = "Сгруппировано ${uiState.ingredients.size} ингредиентов по секциям и добавлено ${uiState.steps.size} шагов.",
+                                        text = AppLocaleManager.tr("Сгруппировано ${uiState.ingredients.size} ингредиентов по секциям и добавлено ${uiState.steps.size} шагов.", "Grouped ${uiState.ingredients.size} ingredients into sections and added ${uiState.steps.size} steps."),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                                     )
@@ -415,82 +408,11 @@ fun RecipeEditScreen(
                             }
                         }
                     }
-                    // AI Assistant Card with Instructions & Quick Actions
-                    if (!isAiDisabled) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Chat,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onTertiaryContainer
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "🤖 Автозаполнение через ИИ (ChatGPT / Claude)",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                Text(
-                                    text = "1️⃣ Нажмите «Промпт для ИИ» ниже.\n2️⃣ Отправьте его нейросети вместе с текстом/фото.\n3️⃣ Скопируйте ответ ИИ и нажмите «Вставить ответ».\n\n💡 Совет: Если у рецепта есть составные части (тесто, крем, соус), напомните нейросети: «Раздели ингредиенты по секциям!»",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            clipboardManager.setText(AnnotatedString(AiPromptTemplates.AI_RECIPE_JSON_PROMPT))
-                                            Toast.makeText(context, "🤖 Промпт для ИИ скопирован в буфер обмена!", Toast.LENGTH_SHORT).show()
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("1. Промпт для ИИ", style = MaterialTheme.typography.labelMedium)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            val clipText = clipboardManager.getText()?.text
-                                            if (!clipText.isNullOrBlank()) {
-                                                viewModel.importFromClipboardText(clipText)
-                                                Toast.makeText(context, "✨ Данные из буфера загружены в редактор!", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "Буфер обмена пуст!", Toast.LENGTH_SHORT).show()
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("2. Вставить ответ", style = MaterialTheme.typography.labelMedium)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     // Title & Time
                     OutlinedTextField(
                         value = uiState.title,
                         onValueChange = { viewModel.updateTitle(it) },
-                        label = { Text("Название блюда *") },
+                        label = { Text(AppLocaleManager.tr("Название блюда *", "Recipe title *")) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -502,7 +424,7 @@ fun RecipeEditScreen(
                         OutlinedTextField(
                             value = uiState.prepTimeMinutesStr,
                             onValueChange = { viewModel.updatePrepTime(it) },
-                            label = { Text("Подготовка (мин)") },
+                            label = { Text(AppLocaleManager.tr("Подготовка (мин)", "Prep (min)")) },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true
@@ -510,7 +432,7 @@ fun RecipeEditScreen(
                         OutlinedTextField(
                             value = uiState.cookTimeMinutesStr,
                             onValueChange = { viewModel.updateCookTime(it) },
-                            label = { Text("Готовка (мин)") },
+                            label = { Text(AppLocaleManager.tr("Готовка (мин)", "Cook (min)")) },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true
@@ -526,7 +448,7 @@ fun RecipeEditScreen(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                         ) {
                             Text(
-                                text = "⏱ Общее время: $totalMins мин (Подготовка $prepMins мин + Готовка $cookMins мин)",
+                                text = "⏱ ${AppLocaleManager.tr("Общее время", "Total time")}: $totalMins ${AppLocaleManager.tr("мин", "min")} (${AppLocaleManager.tr("Подготовка", "Prep")} $prepMins ${AppLocaleManager.tr("мин", "min")} + ${AppLocaleManager.tr("Готовка", "Cook")} $cookMins ${AppLocaleManager.tr("мин", "min")})",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.Bold,
@@ -547,7 +469,7 @@ fun RecipeEditScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Расчет порций",
+                                    text = AppLocaleManager.tr("Расчет порций", "Servings calculation"),
                                     fontWeight = FontWeight.Bold,
                                     style = MaterialTheme.typography.titleMedium
                                 )
@@ -566,7 +488,7 @@ fun RecipeEditScreen(
                                     OutlinedTextField(
                                         value = uiState.baseServingsStr,
                                         onValueChange = { viewModel.updateBaseServings(it) },
-                                        label = { Text("Базовое кол-во") },
+                                        label = { Text(AppLocaleManager.tr("Базовое кол-во", "Base count")) },
                                         modifier = Modifier.weight(1f),
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         singleLine = true
@@ -574,8 +496,8 @@ fun RecipeEditScreen(
                                     OutlinedTextField(
                                         value = uiState.yieldUnit,
                                         onValueChange = { viewModel.updateYieldUnit(it) },
-                                        label = { Text("Единица выхода") },
-                                        placeholder = { Text("порций, штук") },
+                                        label = { Text(AppLocaleManager.tr("Единица выхода", "Yield unit")) },
+                                        placeholder = { Text(AppLocaleManager.tr("порций, штук", "servings, pieces")) },
                                         modifier = Modifier.weight(1f),
                                         singleLine = true
                                     )
@@ -584,10 +506,55 @@ fun RecipeEditScreen(
                         }
                     }
 
+                    // Favorite Toggle Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.updateFavorite(!uiState.isFavorite) },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (uiState.isFavorite) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (uiState.isFavorite) Icons.Default.Star else Icons.Outlined.Star,
+                                    contentDescription = null,
+                                    tint = if (uiState.isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = AppLocaleManager.tr("Избранный рецепт", "Favorite recipe"),
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        text = if (uiState.isFavorite) AppLocaleManager.tr("Помещен в ваш топ избранных блюд", "Added to your favorite recipes") else AppLocaleManager.tr("Добавить в подборку любимых рецептов", "Add to favorite recipes collection"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = uiState.isFavorite,
+                                onCheckedChange = { viewModel.updateFavorite(it) }
+                            )
+                        }
+                    }
+
                     // Tags
                     Column {
                         Text(
-                            text = "Теги и категории",
+                            text = AppLocaleManager.tr("Теги и категории", "Tags & Categories"),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium
                         )
@@ -604,7 +571,7 @@ fun RecipeEditScreen(
                                     trailingIcon = {
                                         Icon(
                                             Icons.Default.Close,
-                                            contentDescription = "Удалить",
+                                            contentDescription = AppLocaleManager.tr("Удалить", "Remove"),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -623,13 +590,13 @@ fun RecipeEditScreen(
                         if (suggestedTags.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Похожие теги в базе:",
+                                text = AppLocaleManager.tr("Похожие теги в базе:", "Matching tags in database:"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                items(suggestedTags) { tag ->
+                                items(suggestedTags, key = { it }) { tag ->
                                     AssistChip(
                                         onClick = {
                                             viewModel.addTag(tag)
@@ -647,7 +614,7 @@ fun RecipeEditScreen(
                             OutlinedTextField(
                                 value = newTagInput,
                                 onValueChange = { newTagInput = it },
-                                placeholder = { Text("Поиск / новый тег...") },
+                                placeholder = { Text(AppLocaleManager.tr("Поиск / новый тег...", "Search / new tag...")) },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
@@ -656,7 +623,7 @@ fun RecipeEditScreen(
                                 viewModel.addTag(newTagInput)
                                 newTagInput = ""
                             }) {
-                                Icon(Icons.Default.Add, contentDescription = "Добавить тег")
+                                Icon(Icons.Default.Add, contentDescription = AppLocaleManager.tr("Добавить тег", "Add tag"))
                             }
                         }
                     }
@@ -669,7 +636,7 @@ fun RecipeEditScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Ингредиенты (${uiState.ingredients.size})",
+                                text = "${AppLocaleManager.tr("Ингредиенты", "Ingredients")} (${uiState.ingredients.size})",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -677,11 +644,11 @@ fun RecipeEditScreen(
                                 TextButton(onClick = { showAddGroupDialog = true }) {
                                     Icon(Icons.Default.Folder, contentDescription = null)
                                     Spacer(modifier = Modifier.width(2.dp))
-                                    Text("＋ Секция")
+                                    Text(AppLocaleManager.tr("＋ Секция", "＋ Section"))
                                 }
                                 TextButton(onClick = { viewModel.addIngredient() }) {
                                     Icon(Icons.Default.Add, contentDescription = null)
-                                    Text("Добавить")
+                                    Text(AppLocaleManager.tr("Добавить", "Add"))
                                 }
                             }
                         }
@@ -719,7 +686,7 @@ fun RecipeEditScreen(
                                             ) {
                                                 Icon(
                                                     Icons.Default.Close,
-                                                    contentDescription = "Удалить группу",
+                                                    contentDescription = AppLocaleManager.tr("Удалить группу", "Remove section"),
                                                     modifier = Modifier.size(16.dp),
                                                     tint = MaterialTheme.colorScheme.error
                                                 )
@@ -752,7 +719,7 @@ fun RecipeEditScreen(
                                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = if (groupName.isNotBlank()) "Добавить в «$groupName»" else "Добавить ингредиент",
+                                            text = if (groupName.isNotBlank()) AppLocaleManager.tr("Добавить в «$groupName»", "Add to \"$groupName\"") else AppLocaleManager.tr("Добавить ингредиент", "Add ingredient"),
                                             style = MaterialTheme.typography.labelMedium
                                         )
                                     }
@@ -769,13 +736,13 @@ fun RecipeEditScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Шаги приготовления (${uiState.steps.size})",
+                                text = "${AppLocaleManager.tr("Шаги приготовления", "Cooking steps")} (${uiState.steps.size})",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             TextButton(onClick = { viewModel.addStep() }) {
                                 Icon(Icons.Default.Add, contentDescription = null)
-                                Text("Добавить шаг")
+                                Text(AppLocaleManager.tr("Добавить шаг", "Add step"))
                             }
                         }
 
@@ -791,13 +758,14 @@ fun RecipeEditScreen(
                             ) {
                                 Column(modifier = Modifier.padding(8.dp)) {
                                     Text(
-                                        text = "Нажмите на ингредиент для вставки токена в шаг №${focusedStepIndex + 1}:",
+                                        text = AppLocaleManager.tr("Нажмите на продукт, чтобы добавить его в описание шага №${focusedStepIndex + 1}:", "Tap product to insert it into step #${focusedStepIndex + 1} text:"),
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        items(validIngredients) { ing ->
+                                        items(validIngredients, key = { it.name + "_" + it.groupName }) { ing ->
                                             val displayName = if (ing.groupName.isNotBlank()) "${ing.name} (${ing.groupName})" else ing.name
                                             AssistChip(
                                                 onClick = {
@@ -828,7 +796,7 @@ fun RecipeEditScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Шаг ${stepItem.stepNumber}",
+                                            text = "${AppLocaleManager.tr("Шаг", "Step")} ${stepItem.stepNumber}",
                                             fontWeight = FontWeight.Bold,
                                             style = MaterialTheme.typography.titleSmall
                                         )
@@ -841,7 +809,7 @@ fun RecipeEditScreen(
                                             ) {
                                                 Icon(
                                                     Icons.Default.ArrowUpward,
-                                                    contentDescription = "Переместить вверх",
+                                                    contentDescription = AppLocaleManager.tr("Переместить вверх", "Move up"),
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -853,7 +821,7 @@ fun RecipeEditScreen(
                                             ) {
                                                 Icon(
                                                     Icons.Default.ArrowDownward,
-                                                    contentDescription = "Переместить вниз",
+                                                    contentDescription = AppLocaleManager.tr("Переместить вниз", "Move down"),
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -866,7 +834,7 @@ fun RecipeEditScreen(
                                             }) {
                                                 Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Фото", style = MaterialTheme.typography.labelSmall)
+                                                Text(AppLocaleManager.tr("Фото", "Photo"), style = MaterialTheme.typography.labelSmall)
                                             }
 
                                             if (uiState.steps.size > 1) {
@@ -876,7 +844,7 @@ fun RecipeEditScreen(
                                                 ) {
                                                     Icon(
                                                         Icons.Default.Delete,
-                                                        contentDescription = "Удалить шаг",
+                                                        contentDescription = AppLocaleManager.tr("Удалить шаг", "Delete step"),
                                                         tint = MaterialTheme.colorScheme.error,
                                                         modifier = Modifier.size(18.dp)
                                                     )
@@ -901,7 +869,7 @@ fun RecipeEditScreen(
                                             focusedStepIndex = index
                                             viewModel.updateStep(index, newValue.text, newValue.selection.start)
                                         },
-                                        placeholder = { Text("Опишите действия...") },
+                                        placeholder = { Text(AppLocaleManager.tr("Опишите действия...", "Describe instructions...")) },
                                         modifier = Modifier.fillMaxWidth(),
                                         maxLines = 5
                                     )
@@ -910,7 +878,7 @@ fun RecipeEditScreen(
                                     if (stepItem.imageUris.isNotEmpty()) {
                                         Spacer(modifier = Modifier.height(6.dp))
                                         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            items(stepItem.imageUris) { uriStr ->
+                                            items(stepItem.imageUris, key = { it }) { uriStr ->
                                                 val isVideo = MediaViewerUtils.isVideoUri(uriStr, context)
                                                 Box(
                                                     modifier = Modifier
@@ -932,7 +900,7 @@ fun RecipeEditScreen(
                                                                 .background(Color.Black.copy(alpha = 0.6f), CircleShape),
                                                             contentAlignment = Alignment.Center
                                                         ) {
-                                                            Icon(Icons.Default.PlayArrow, contentDescription = "Видео", tint = Color.White, modifier = Modifier.size(16.dp))
+                                                            Icon(Icons.Default.PlayArrow, contentDescription = AppLocaleManager.tr("Видео", "Video"), tint = Color.White, modifier = Modifier.size(16.dp))
                                                         }
                                                     }
                                                     IconButton(
@@ -942,7 +910,7 @@ fun RecipeEditScreen(
                                                             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
                                                             .size(22.dp)
                                                     ) {
-                                                        Icon(Icons.Default.Close, contentDescription = "Удалить", modifier = Modifier.size(12.dp))
+                                                        Icon(Icons.Default.Close, contentDescription = AppLocaleManager.tr("Удалить", "Delete"), modifier = Modifier.size(12.dp))
                                                     }
                                                 }
                                             }
@@ -970,14 +938,19 @@ fun RecipeEditScreen(
                             ) {
                                 Column {
                                     Text(
-                                        text = "📊 Пищевая ценность (КБЖУ на порцию)",
+                                        text = "📊 ${AppLocaleManager.tr("Пищевая ценность (КБЖУ на порцию)", "Nutritional Value (per serving)")}",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                     if (hasNutrition) {
                                         Spacer(modifier = Modifier.height(2.dp))
+                                        val calWord = AppLocaleManager.tr("ккал", "kcal")
+                                        val pWord = AppLocaleManager.tr("Б", "P")
+                                        val fWord = AppLocaleManager.tr("Ж", "F")
+                                        val cWord = AppLocaleManager.tr("У", "C")
+                                        val gWord = AppLocaleManager.tr("г", "g")
                                         Text(
-                                            text = "🔥 ${uiState.caloriesStr.ifBlank { "0" }} ккал | 🥩 Б: ${uiState.proteinStr.ifBlank { "0" }}г | 🧈 Ж: ${uiState.fatStr.ifBlank { "0" }}г | 🌾 У: ${uiState.carbsStr.ifBlank { "0" }}г",
+                                            text = "🔥 ${uiState.caloriesStr.ifBlank { "0" }} $calWord | 🥩 $pWord: ${uiState.proteinStr.ifBlank { "0" }}$gWord | 🧈 $fWord: ${uiState.fatStr.ifBlank { "0" }}$gWord | 🌾 $cWord: ${uiState.carbsStr.ifBlank { "0" }}$gWord",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.primary,
                                             fontWeight = FontWeight.SemiBold
@@ -996,7 +969,7 @@ fun RecipeEditScreen(
                                         OutlinedTextField(
                                             value = uiState.caloriesStr,
                                             onValueChange = { viewModel.updateCalories(it) },
-                                            label = { Text("Ккал") },
+                                            label = { Text(AppLocaleManager.tr("Ккал", "Kcal")) },
                                             modifier = Modifier.weight(1f),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             singleLine = true
@@ -1004,7 +977,7 @@ fun RecipeEditScreen(
                                         OutlinedTextField(
                                             value = uiState.proteinStr,
                                             onValueChange = { viewModel.updateProtein(it) },
-                                            label = { Text("Белки (г)") },
+                                            label = { Text(AppLocaleManager.tr("Белки (г)", "Protein (g)")) },
                                             modifier = Modifier.weight(1f),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             singleLine = true
@@ -1015,7 +988,7 @@ fun RecipeEditScreen(
                                         OutlinedTextField(
                                             value = uiState.fatStr,
                                             onValueChange = { viewModel.updateFat(it) },
-                                            label = { Text("Жиры (г)") },
+                                            label = { Text(AppLocaleManager.tr("Жиры (г)", "Fat (g)")) },
                                             modifier = Modifier.weight(1f),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             singleLine = true
@@ -1023,11 +996,31 @@ fun RecipeEditScreen(
                                         OutlinedTextField(
                                             value = uiState.carbsStr,
                                             onValueChange = { viewModel.updateCarbs(it) },
-                                            label = { Text("Углеводы (г)") },
+                                            label = { Text(AppLocaleManager.tr("Углеводы (г)", "Carbs (g)")) },
                                             modifier = Modifier.weight(1f),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             singleLine = true
                                         )
+                                    }
+
+                                    if (!isAiDisabled) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        OutlinedButton(
+                                            onClick = {
+                                                val ingNames = uiState.ingredients.mapNotNull { it.name.ifBlank { null } }
+                                                if (ingNames.isEmpty()) {
+                                                    Toast.makeText(context, AppLocaleManager.tr("Сначала добавьте названия ингредиентов!", "Add ingredient names first!"), Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    showGeminiDialog = true
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(AppLocaleManager.tr("✨ Рассчитать КБЖУ через Шеф-Помощника", "✨ Calculate macros with Chef Assistant"), style = MaterialTheme.typography.labelMedium)
+                                        }
                                     }
                                 }
                             }
@@ -1041,7 +1034,7 @@ fun RecipeEditScreen(
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
-                                text = "Параметры готовки («Шпаргалка шефа»)",
+                                text = AppLocaleManager.tr("Параметры готовки («Шпаргалка шефа»)", "Cooking Parameters (\"Chef's Cheat Sheet\")"),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1051,15 +1044,15 @@ fun RecipeEditScreen(
                                 OutlinedTextField(
                                     value = uiState.chefHeatingType,
                                     onValueChange = { viewModel.updateChefHeatingType(it) },
-                                    label = { Text("Тип нагрева") },
-                                    placeholder = { Text("Духовка / Плита") },
+                                    label = { Text(AppLocaleManager.tr("Тип нагрева", "Heating type")) },
+                                    placeholder = { Text(AppLocaleManager.tr("Духовка / Плита", "Oven / Stove")) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
                                 OutlinedTextField(
                                     value = uiState.chefTemperature,
                                     onValueChange = { viewModel.updateChefTemperature(it) },
-                                    label = { Text("Температура") },
+                                    label = { Text(AppLocaleManager.tr("Температура", "Temperature")) },
                                     placeholder = { Text("180 °C") },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
@@ -1072,16 +1065,16 @@ fun RecipeEditScreen(
                                 OutlinedTextField(
                                     value = uiState.chefTiming,
                                     onValueChange = { viewModel.updateChefTiming(it) },
-                                    label = { Text("Тайминг") },
-                                    placeholder = { Text("25 мин") },
+                                    label = { Text(AppLocaleManager.tr("Тайминг", "Timing")) },
+                                    placeholder = { Text(AppLocaleManager.tr("25 мин", "25 min")) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
                                 OutlinedTextField(
                                     value = uiState.chefReadinessSign,
                                     onValueChange = { viewModel.updateChefReadinessSign(it) },
-                                    label = { Text("Признак готовности") },
-                                    placeholder = { Text("Золотистая корочка") },
+                                    label = { Text(AppLocaleManager.tr("Признак готовности", "Readiness sign")) },
+                                    placeholder = { Text(AppLocaleManager.tr("Золотистая корочка", "Golden brown crust")) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
@@ -1101,7 +1094,7 @@ fun RecipeEditScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Прикрепленные медиа (${uiState.imageUris.size})",
+                                    text = "${AppLocaleManager.tr("Прикрепленные медиа", "Attached media")} (${uiState.imageUris.size})",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1112,14 +1105,14 @@ fun RecipeEditScreen(
                                 }) {
                                     Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Галерея")
+                                    Text(AppLocaleManager.tr("Галерея", "Gallery"))
                                 }
                             }
 
                             if (uiState.imageUris.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    items(uiState.imageUris) { uriStr ->
+                                    items(uiState.imageUris, key = { it }) { uriStr ->
                                         val isVideo = MediaViewerUtils.isVideoUri(uriStr, context)
                                         Box(
                                             modifier = Modifier
@@ -1143,7 +1136,7 @@ fun RecipeEditScreen(
                                                 ) {
                                                     Icon(
                                                         Icons.Default.PlayArrow,
-                                                        contentDescription = "Видео",
+                                                        contentDescription = AppLocaleManager.tr("Видео", "Video"),
                                                         tint = Color.White
                                                     )
                                                 }
@@ -1160,7 +1153,7 @@ fun RecipeEditScreen(
                                             ) {
                                                 Icon(
                                                     Icons.Default.Close,
-                                                    contentDescription = "Удалить",
+                                                    contentDescription = AppLocaleManager.tr("Удалить", "Delete"),
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
@@ -1175,7 +1168,7 @@ fun RecipeEditScreen(
                     OutlinedTextField(
                         value = uiState.notes,
                         onValueChange = { viewModel.updateNotes(it) },
-                        label = { Text("Заметки, кулинарные хитрости, бренды") },
+                        label = { Text(AppLocaleManager.tr("Заметки, кулинарные хитрости, бренды", "Notes, culinary tips, brands")) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(100.dp),
@@ -1190,12 +1183,12 @@ fun RecipeEditScreen(
     if (showAddGroupDialog) {
         AlertDialog(
             onDismissRequest = { showAddGroupDialog = false },
-            title = { Text("Добавить секцию ингредиентов") },
+            title = { Text(AppLocaleManager.tr("Добавить секцию ингредиентов", "Add ingredient section")) },
             text = {
                 OutlinedTextField(
                     value = newGroupInput,
                     onValueChange = { newGroupInput = it },
-                    label = { Text("Название секции (напр. Для теста, Для крема)") },
+                    label = { Text(AppLocaleManager.tr("Название секции (напр. Для теста, Для крема)", "Section name (e.g. For dough, For cream)")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1211,12 +1204,12 @@ fun RecipeEditScreen(
                         showAddGroupDialog = false
                     }
                 ) {
-                    Text("Добавить")
+                    Text(AppLocaleManager.tr("Добавить", "Add"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAddGroupDialog = false }) {
-                    Text("Отмена")
+                    Text(AppLocaleManager.tr("Отмена", "Cancel"))
                 }
             }
         )
@@ -1245,10 +1238,14 @@ fun ChefEditorDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
-    var promptInput by remember(uiState.title) {
-        mutableStateOf(if (uiState.title.isNotBlank()) "Заполни и сгруппируй ингредиенты и шаги для: ${uiState.title}" else "")
+    val defaultPrompt = remember(uiState.title) {
+        if (uiState.title.isNotBlank()) {
+            AppLocaleManager.tr("Заполни и сгруппируй ингредиенты и шаги для: ${uiState.title}", "Fill and group ingredients and steps for: ${uiState.title}")
+        } else ""
     }
+    var promptInput by remember(defaultPrompt) { mutableStateOf(defaultPrompt) }
     var selectedImageUri by remember { mutableStateOf<String?>(null) }
     var isGenerating by remember { mutableStateOf(false) }
     var isConnected by remember { mutableStateOf(false) }
@@ -1262,7 +1259,7 @@ fun ChefEditorDialog(
             val persistentPath = MediaViewerUtils.saveUriToInternalStorage(context, uri)
             selectedImageUri = persistentPath
             if (promptInput.isBlank()) {
-                promptInput = "Распознай и отформатируй рецепт с прикрепленного фото кулинарной книги"
+                promptInput = AppLocaleManager.tr("Распознай и отформатируй рецепт с прикрепленного фото кулинарной книги", "Recognize and format recipe from attached cookbook photo")
             }
         }
     }
@@ -1273,7 +1270,7 @@ fun ChefEditorDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("👨‍🍳 Шеф-Помощник редактора", fontWeight = FontWeight.Bold)
+                Text("👨‍🍳 ${AppLocaleManager.tr("Шеф-Помощник редактора", "Editor Chef Assistant")}", fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -1285,116 +1282,116 @@ fun ChefEditorDialog(
                     .imePadding(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "Шеф-Помощник автоматически разбьет ингредиенты по секциям (для теста, для соуса и т.д.), рассчитает время и расставит таймеры в шагах.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // Quick Action Chips
-                Column {
-                    Text(
-                        text = "💡 Быстрый сценарий:",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                if (isGenerating) {
+                    AiGenerationProgressBox(
+                        isCompleted = isCompleted
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                } else {
+                    Text(
+                        text = AppLocaleManager.tr("Шеф-Помощник автоматически разбьет ингредиенты по секциям (для теста, для соуса и т.д.), рассчитает время и расставит таймеры в шагах.", "Chef Assistant will automatically group ingredients into sections (for dough, for sauce, etc.), calculate time and set timers in steps."),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Quick Action Chips
+                    Column {
+                        Text(
+                            text = "💡 ${AppLocaleManager.tr("Быстрый сценарий:", "Quick scenario:")}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    promptInput = AppLocaleManager.tr("Сгруппируй все ингредиенты по кулинарным секциям и структурируй шаги", "Group all ingredients by culinary sections and structure steps")
+                                },
+                                label = { Text(AppLocaleManager.tr("🛒 Сгруппировать ингредиенты", "🛒 Group ingredients")) },
+                                enabled = !isGenerating
+                            )
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    promptInput = AppLocaleManager.tr("Рассчитай общее время приготовления, параметры нагрева и расставь таймеры в минутах к шагам", "Calculate total cooking time, heating params and set timers in steps")
+                                },
+                                label = { Text(AppLocaleManager.tr("⏱ Добавить таймеры", "⏱ Add timers")) },
+                                enabled = !isGenerating
+                            )
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    photoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                                label = { Text(AppLocaleManager.tr("📷 Фото кулинарной книги", "📷 Cookbook photo")) },
+                                enabled = !isGenerating
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = promptInput,
+                        onValueChange = { promptInput = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 90.dp, max = 130.dp),
+                        placeholder = { Text(AppLocaleManager.tr("Введите название или текст рецепта...", "Enter recipe title or text...")) },
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !isGenerating
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FilterChip(
-                            selected = false,
-                            onClick = {
-                                promptInput = "Сгруппируй все ингредиенты по кулинарным секциям и структурируй шаги"
-                            },
-                            label = { Text("🛒 Сгруппировать ингредиенты") },
-                            enabled = !isGenerating
-                        )
-                        FilterChip(
-                            selected = false,
-                            onClick = {
-                                promptInput = "Рассчитай общее время приготовления, параметры нагрева и расставь таймеры в минутах к шагам"
-                            },
-                            label = { Text("⏱ Добавить таймеры") },
-                            enabled = !isGenerating
-                        )
-                        FilterChip(
-                            selected = false,
+                        OutlinedButton(
                             onClick = {
                                 photoPickerLauncher.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
                             },
-                            label = { Text("📷 Фото кулинарной книги") },
-                            enabled = !isGenerating
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = promptInput,
-                    onValueChange = { promptInput = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 90.dp, max = 130.dp),
-                    placeholder = { Text("Введите название или текст рецепта...") },
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = !isGenerating
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                        enabled = !isGenerating
-                    ) {
-                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (selectedImageUri != null) "Изменить фото" else "Прикрепить фото")
-                    }
-
-                    if (selectedImageUri != null) {
-                        TextButton(
-                            onClick = { selectedImageUri = null },
                             enabled = !isGenerating
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text("Удалить", style = MaterialTheme.typography.labelSmall)
+                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (selectedImageUri != null) AppLocaleManager.tr("Изменить фото", "Change photo") else AppLocaleManager.tr("Прикрепить фото", "Attach photo"))
+                        }
+
+                        if (selectedImageUri != null) {
+                            TextButton(
+                                onClick = { selectedImageUri = null },
+                                enabled = !isGenerating
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(AppLocaleManager.tr("Удалить", "Remove"), style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
-                }
 
-                selectedImageUri?.let { uriStr ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(110.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        AsyncImage(
-                            model = uriStr,
-                            contentDescription = "Прикрепленный снимок рецепта",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                    selectedImageUri?.let { uriStr ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(110.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            AsyncImage(
+                                model = uriStr,
+                                contentDescription = AppLocaleManager.tr("Прикрепленный снимок рецепта", "Attached recipe image"),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
-                }
-
-                if (isGenerating) {
-                    AiGenerationProgressBox(
-                        isCompleted = isCompleted
-                    )
                 }
 
                 errorMessage?.let { err ->
@@ -1410,7 +1407,7 @@ fun ChefEditorDialog(
             Button(
                 onClick = {
                     if (promptInput.isBlank() && selectedImageUri == null) {
-                        errorMessage = "Введите название блюда или прикрепите фото!"
+                        errorMessage = AppLocaleManager.tr("Введите название блюда или прикрепите фото!", "Enter recipe title or attach photo!")
                         return@Button
                     }
                     isGenerating = true
@@ -1426,8 +1423,11 @@ fun ChefEditorDialog(
                         },
                         onSuccess = {
                             isCompleted = true
-                            onDismiss()
-                            Toast.makeText(context, "Поля рецепта структурированы Шеф-Помощником!", Toast.LENGTH_SHORT).show()
+                            coroutineScope.launch {
+                                kotlinx.coroutines.delay(750)
+                                onDismiss()
+                                Toast.makeText(context, AppLocaleManager.tr("Поля рецепта структурированы Шеф-Помощником!", "Recipe fields structured by Chef Assistant!"), Toast.LENGTH_SHORT).show()
+                            }
                         },
                         onError = { err ->
                             isGenerating = false
@@ -1441,12 +1441,12 @@ fun ChefEditorDialog(
             ) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Заполнить")
+                Text(AppLocaleManager.tr("Заполнить", "Fill in"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !isGenerating) {
-                Text("Отмена")
+                Text(AppLocaleManager.tr("Отмена", "Cancel"))
             }
         }
     )
@@ -1462,12 +1462,22 @@ fun IngredientRowEdit(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit
 ) {
+    val context = LocalContext.current
     var showUnitMenu by remember { mutableStateOf(false) }
     var showNoteInput by remember { mutableStateOf(false) } // HIDDEN BY DEFAULT
     var showGroupInput by remember { mutableStateOf(false) }
 
+    val isDensityEnabled = remember { ExperimentalSettingsManager.getSettings(context).densityHintsEnabled }
+    val densityInfo = remember(item.name, isDensityEnabled) {
+        if (isDensityEnabled && item.name.isNotBlank()) UnitConverter.findDensity(item.name) else null
+    }
+
     val haptic = LocalHapticFeedback.current
     var dragTotalY by remember { mutableFloatStateOf(0f) }
+
+    val currentUnits = remember(AppLocaleManager.isEnglish) {
+        UnitConverter.getSupportedUnits()
+    }
 
     Card(
         modifier = Modifier
@@ -1508,7 +1518,7 @@ fun IngredientRowEdit(
                 OutlinedTextField(
                     value = item.name,
                     onValueChange = { onUpdate(item.copy(name = it)) },
-                    placeholder = { Text("Ингредиент (название)") },
+                    placeholder = { Text(AppLocaleManager.tr("Ингредиент (название)", "Ingredient (name)")) },
                     modifier = Modifier.weight(3f),
                     singleLine = true
                 )
@@ -1520,17 +1530,18 @@ fun IngredientRowEdit(
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                     ) {
-                        Text(item.unit, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(UnitConverter.formatUnitForDisplay(item.unit), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     DropdownMenu(
                         expanded = showUnitMenu,
                         onDismissRequest = { showUnitMenu = false }
                     ) {
-                        UnitConverter.SUPPORTED_UNITS.forEach { unitStr ->
+                        currentUnits.forEach { unitStr ->
                             DropdownMenuItem(
                                 text = { Text(unitStr) },
                                 onClick = {
-                                    onUpdate(item.copy(unit = unitStr, selectedUnit = unitStr))
+                                    val normUnit = UnitConverter.normalizeUnit(unitStr)
+                                    onUpdate(item.copy(unit = normUnit, selectedUnit = normUnit))
                                     showUnitMenu = false
                                 }
                             )
@@ -1554,7 +1565,7 @@ fun IngredientRowEdit(
                     // Drag handle
                     Icon(
                         Icons.Default.Reorder,
-                        contentDescription = "Зажмите и потяните",
+                        contentDescription = AppLocaleManager.tr("Зажмите и потяните", "Hold and drag"),
                         tint = MaterialTheme.colorScheme.outline,
                         modifier = Modifier
                             .size(24.dp)
@@ -1565,7 +1576,7 @@ fun IngredientRowEdit(
                     OutlinedTextField(
                         value = item.amountStr,
                         onValueChange = { onUpdate(item.copy(amountStr = it)) },
-                        placeholder = { Text("Кол-во") },
+                        placeholder = { Text(AppLocaleManager.tr("Кол-во", "Qty")) },
                         modifier = Modifier.width(110.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true
@@ -1589,7 +1600,7 @@ fun IngredientRowEdit(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (item.groupName.isNotBlank()) item.groupName else "Секция",
+                                text = item.groupName.ifBlank { AppLocaleManager.tr("＋ Секция", "＋ Section") },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (item.groupName.isNotBlank()) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.outline
                             )
@@ -1614,7 +1625,7 @@ fun IngredientRowEdit(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (item.note.isNotBlank()) "Заметка *" else "+Заметка",
+                                text = if (item.note.isNotBlank()) AppLocaleManager.tr("Заметка *", "Note *") else AppLocaleManager.tr("＋ Заметка", "＋ Note"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (item.note.isNotBlank()) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.outline
                             )
@@ -1628,7 +1639,7 @@ fun IngredientRowEdit(
                 ) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Удалить",
+                        contentDescription = AppLocaleManager.tr("Удалить", "Delete"),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp)
                     )
@@ -1640,7 +1651,7 @@ fun IngredientRowEdit(
                 OutlinedTextField(
                     value = item.groupName,
                     onValueChange = { onUpdate(item.copy(groupName = it)) },
-                    placeholder = { Text("Секция (напр. Для теста, Для крема)") },
+                    placeholder = { Text(AppLocaleManager.tr("Секция (например: Для теста, Для крема, Для соуса)", "Section (e.g.: For dough, For cream, For sauce)")) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -1651,10 +1662,29 @@ fun IngredientRowEdit(
                 OutlinedTextField(
                     value = item.note,
                     onValueChange = { onUpdate(item.copy(note = it)) },
-                    placeholder = { Text("Примечание (напр. просеять, по вкусу)") },
+                    placeholder = { Text(AppLocaleManager.tr("Примечание (например: просеять, комнатной температуры)", "Note (e.g.: sifted, room temperature)")) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+            }
+
+            if (densityInfo != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                ) {
+                    val tbspWord = AppLocaleManager.tr("ст. л.", "tbsp")
+                    val tspWord = AppLocaleManager.tr("ч. л.", "tsp")
+                    val cupWord = AppLocaleManager.tr("стакан", "cup")
+                    val gWord = AppLocaleManager.tr("г", "g")
+                    Text(
+                        text = "💡 1 $tbspWord = ${densityInfo.gPerTbsp.toInt()}$gWord | 1 $tspWord = ${densityInfo.gPerTsp.toInt()}$gWord | 1 $cupWord = ${densityInfo.gPerCup.toInt()}$gWord",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
             }
         }
     }
@@ -1707,4 +1737,3 @@ fun AiFillHighlightCard(
         content()
     }
 }
-

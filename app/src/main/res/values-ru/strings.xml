@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Кулинария</string>
+    <string name="nav_back">Назад</string>
+    <string name="save">Сохранить</string>
+    <string name="cancel">Отмена</string>
+    <string name="search_placeholder">Поиск по названию или ингредиентам&#8230;</string>
+    <string name="cook_mode_title">Режим готовки</string>
+    <string name="ai_assistant">ИИ-Ассистент</string>
+    <string name="ingredients">Ингредиенты</string>
+    <string name="steps">Шаги приготовления</string>
+    <string name="settings">Настройки</string>
+    <string name="onboarding_title">Кулинарный Помощник</string>
+    <string name="timer_channel_name">Таймеры готовки</string>
+    <string name="timer_channel_desc">Уведомления о завершении кулинарных таймеров</string>
+    <string name="timer_completed_title">⏱️ Таймер завершён!</string>
+    <string name="timer_add_min">+1 мин</string>
+    <string name="timer_reset">Сбросить</string>
+</resources>

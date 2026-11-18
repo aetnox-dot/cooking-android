@@ -90,4 +90,19 @@ class UnitConverterTest {
         // Flour from tbsp to grams IS convertible via density
         assert(UnitConverter.canConvert("ст. л.", "г", ingredientName = "мука"))
     }
+
+    @Test
+    fun testUnitDisplayTranslation() {
+        assertEquals("g", UnitConverter.formatUnitForDisplay("г", isEnglish = true))
+        assertEquals("kg", UnitConverter.formatUnitForDisplay("кг", isEnglish = true))
+        assertEquals("ml", UnitConverter.formatUnitForDisplay("мл", isEnglish = true))
+        assertEquals("l", UnitConverter.formatUnitForDisplay("л", isEnglish = true))
+        assertEquals("tbsp", UnitConverter.formatUnitForDisplay("ст. л.", isEnglish = true))
+        assertEquals("tsp", UnitConverter.formatUnitForDisplay("ч. л.", isEnglish = true))
+        assertEquals("cup", UnitConverter.formatUnitForDisplay("стакан", isEnglish = true))
+        assertEquals("pc", UnitConverter.formatUnitForDisplay("шт", isEnglish = true))
+
+        assertEquals("г", UnitConverter.formatUnitForDisplay("г", isEnglish = false))
+        assertEquals("ст. л.", UnitConverter.formatUnitForDisplay("ст. л.", isEnglish = false))
+    }
 }

@@ -5,6 +5,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -14,11 +17,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.aetnox.cooking.data.database.AppDatabase
+import com.aetnox.cooking.data.remote.AppStartupManager
 import com.aetnox.cooking.data.repository.RecipeRepository
+import com.aetnox.cooking.ui.screen.CookViewTab
+import com.aetnox.cooking.ui.component.ForcedUpdateDialog
 import com.aetnox.cooking.ui.screen.BackupScreen
 import com.aetnox.cooking.ui.screen.CookModeScreen
 import com.aetnox.cooking.ui.screen.RecipeEditScreen
 import com.aetnox.cooking.ui.screen.RecipeListScreen
+import com.aetnox.cooking.ui.util.AppLogger
 import com.aetnox.cooking.ui.viewmodel.BackupViewModel
 import com.aetnox.cooking.ui.viewmodel.CookModeViewModel
 import com.aetnox.cooking.ui.viewmodel.RecipeEditViewModel
@@ -33,11 +40,36 @@ object CookingRoutes {
 
 @Composable
 fun CookingNavHost(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    initialRecipeId: Long? = null,
+    initialStepIndex: Int? = null,
+    onNavigatedToDeepLink: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val database = AppDatabase.getInstance(context)
     val repository = RecipeRepository(database.recipeDao())
+
+    val startupState by AppStartupManager.startupState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        AppStartupManager.checkAppLaunch(context)
+    }
+
+    LaunchedEffect(initialRecipeId, initialStepIndex) {
+        if (initialRecipeId != null && initialRecipeId > 0) {
+            val stepParam = initialStepIndex ?: 0
+            AppLogger.d("NAV", "Handling DeepLink intent to recipeId=$initialRecipeId, step=$stepParam")
+            navController.navigate("${CookingRoutes.COOK_MODE}/$initialRecipeId?stepIndex=$stepParam&initialTab=STEP_BY_STEP")
+            onNavigatedToDeepLink()
+        }
+    }
+
+    if (startupState.isUpdateRequired) {
+        ForcedUpdateDialog(
+            updateUrl = startupState.updateUrl,
+            minVersionCode = startupState.minVersionCode
+        )
+    }
 
     NavHost(
         navController = navController,
@@ -75,21 +107,27 @@ fun CookingNavHost(
                 viewModel = viewModel,
                 onNavigateToEdit = { recipeId ->
                     if (recipeId != null && recipeId > 0) {
+                        AppLogger.d("NAV", "Navigating to Edit Screen for recipeId=$recipeId")
                         navController.navigate("${CookingRoutes.RECIPE_EDIT}?recipeId=$recipeId")
                     } else {
+                        AppLogger.d("NAV", "Navigating to New Recipe Creation Screen")
                         navController.navigate(CookingRoutes.RECIPE_EDIT)
                     }
                 },
-                onNavigateToCookMode = { recipeId ->
-                    navController.navigate("${CookingRoutes.COOK_MODE}/$recipeId")
+                onNavigateToCookMode = { recipeId, initialTab ->
+                    AppLogger.d("NAV", "Navigating to CookModeScreen for recipeId=$recipeId, initialTab=$initialTab")
+                    navController.navigate("${CookingRoutes.COOK_MODE}/$recipeId?initialTab=$initialTab")
                 },
                 onNavigateToBackup = {
+                    AppLogger.d("NAV", "Navigating to Backup & Settings Screen")
                     navController.navigate(CookingRoutes.BACKUP)
                 },
                 onQuickDraftClick = {
+                    AppLogger.d("NAV", "Navigating to Quick Draft Creation")
                     navController.navigate("${CookingRoutes.RECIPE_EDIT}?draft=true")
                 },
                 onImportClipboardClick = {
+                    AppLogger.d("NAV", "Navigating to Recipe Import from Clipboard")
                     navController.navigate(CookingRoutes.RECIPE_EDIT)
                 }
             )
@@ -122,28 +160,54 @@ fun CookingNavHost(
 
             RecipeEditScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() },
+                onNavigateBack = {
+                    AppLogger.d("NAV", "Popping back stack from RecipeEditScreen")
+                    navController.popBackStack()
+                },
                 onRecipeSaved = { savedId ->
+                    AppLogger.d("NAV", "Recipe saved successfully (id=$savedId), popping back stack")
                     navController.popBackStack()
                 }
             )
         }
 
         composable(
-            route = "${CookingRoutes.COOK_MODE}/{recipeId}",
+            route = "${CookingRoutes.COOK_MODE}/{recipeId}?stepIndex={stepIndex}&initialTab={initialTab}",
             arguments = listOf(
-                navArgument("recipeId") { type = NavType.LongType }
+                navArgument("recipeId") { type = NavType.LongType },
+                navArgument("stepIndex") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                },
+                navArgument("initialTab") {
+                    type = NavType.StringType
+                    defaultValue = "STEP_BY_STEP"
+                }
             )
         ) { backStackEntry ->
             val recipeId = backStackEntry.arguments?.getLong("recipeId") ?: 0L
+            val stepIndexParam = backStackEntry.arguments?.getInt("stepIndex") ?: -1
+            val initialTabParam = backStackEntry.arguments?.getString("initialTab") ?: "STEP_BY_STEP"
+
             val viewModel: CookModeViewModel = viewModel(
                 factory = CookModeViewModel.Factory(repository, recipeId)
             )
 
+            LaunchedEffect(stepIndexParam) {
+                if (stepIndexParam >= 0) {
+                    viewModel.setActiveStepIndex(stepIndexParam)
+                }
+            }
+
             CookModeScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() },
+                initialTab = if (initialTabParam == "OVERVIEW") CookViewTab.OVERVIEW else CookViewTab.STEP_BY_STEP,
+                onNavigateBack = {
+                    AppLogger.d("NAV", "Popping back stack from CookModeScreen")
+                    navController.popBackStack()
+                },
                 onNavigateToEdit = { editId ->
+                    AppLogger.d("NAV", "Navigating to Edit Screen from CookModeScreen for recipeId=$editId")
                     navController.navigate("${CookingRoutes.RECIPE_EDIT}?recipeId=$editId")
                 }
             )
@@ -155,7 +219,10 @@ fun CookingNavHost(
             )
             BackupScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = {
+                    AppLogger.d("NAV", "Popping back stack from BackupScreen")
+                    navController.popBackStack()
+                }
             )
         }
     }

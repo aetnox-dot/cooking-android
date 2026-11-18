@@ -7,7 +7,12 @@ import androidx.lifecycle.viewModelScope
 import com.aetnox.cooking.data.entity.IngredientEntity
 import com.aetnox.cooking.data.entity.RecipeEntity
 import com.aetnox.cooking.data.entity.StepEntity
+import com.aetnox.cooking.data.remote.ApiException
+import com.aetnox.cooking.data.remote.BackendRepository
+import com.aetnox.cooking.data.remote.model.ApiErrorCodes
+import com.aetnox.cooking.data.remote.model.toParsedRecipe
 import com.aetnox.cooking.data.repository.RecipeRepository
+import com.aetnox.cooking.ui.util.AppLocaleManager
 import com.aetnox.cooking.domain.ai.GeminiApiService
 import com.aetnox.cooking.domain.converter.UnitConverter
 import com.aetnox.cooking.domain.parser.ParsedRecipe
@@ -22,8 +27,8 @@ data class IngredientUiItem(
     val id: Long = 0,
     val name: String = "",
     val amountStr: String = "",
-    val unit: String = "г",
-    val selectedUnit: String = "г",
+    val unit: String = AppLocaleManager.tr("г", "g"),
+    val selectedUnit: String = AppLocaleManager.tr("г", "g"),
     val note: String = "",
     val groupName: String = ""
 )
@@ -44,8 +49,9 @@ data class RecipeEditUiState(
     val cookTimeMinutesStr: String = "",
     val servingsEnabled: Boolean = true,
     val baseServingsStr: String = "4",
-    val yieldUnit: String = "порций",
+    val yieldUnit: String = AppLocaleManager.tr("порций", "servings"),
     val status: String = RecipeEntity.STATUS_PLANNED,
+    val isFavorite: Boolean = false,
     val rating: Int = 0,
     val postCookNote: String = "",
     val chefHeatingType: String = "",
@@ -111,7 +117,7 @@ class RecipeEditViewModel(
                 val stepUi = item.steps.sortedBy { it.stepNumber }.map { s ->
                     val stepImages = try {
                         kotlinx.serialization.json.Json.decodeFromString<List<String>>(s.imageUrisJson)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         emptyList()
                     }
                     StepUiItem(
@@ -134,9 +140,10 @@ class RecipeEditViewModel(
                     prepTimeMinutesStr = if (r.prepTimeMinutes > 0) r.prepTimeMinutes.toString() else "",
                     cookTimeMinutesStr = if (r.cookTimeMinutes > 0) r.cookTimeMinutes.toString() else "",
                     servingsEnabled = r.servingsEnabled,
-                    baseServingsStr = UnitConverter.formatAmount(r.baseServings, "шт"),
+                    baseServingsStr = UnitConverter.formatAmount(r.baseServings, AppLocaleManager.tr("шт", "pcs")),
                     yieldUnit = r.yieldUnit,
                     status = r.status,
+                    isFavorite = r.isFavorite,
                     rating = r.rating,
                     postCookNote = r.postCookNote,
                     chefHeatingType = r.chefHeatingType,
@@ -152,8 +159,8 @@ class RecipeEditViewModel(
                     proteinStr = r.protein?.toString() ?: "",
                     fatStr = r.fat?.toString() ?: "",
                     carbsStr = r.carbs?.toString() ?: "",
-                    ingredients = if (ingUi.isEmpty()) listOf(IngredientUiItem()) else ingUi,
-                    steps = if (stepUi.isEmpty()) listOf(StepUiItem(stepNumber = 1)) else stepUi,
+                    ingredients = ingUi.ifEmpty { listOf(IngredientUiItem()) },
+                    steps = stepUi.ifEmpty { listOf(StepUiItem(stepNumber = 1)) },
                     tags = item.tags.map { it.name },
                     isLoaded = true
                 )
@@ -189,6 +196,10 @@ class RecipeEditViewModel(
 
     fun updateYieldUnit(unit: String) {
         _uiState.value = _uiState.value.copy(yieldUnit = unit)
+    }
+
+    fun updateFavorite(isFav: Boolean) {
+        _uiState.value = _uiState.value.copy(isFavorite = isFav)
     }
 
     fun updateRating(r: Int) {
@@ -237,8 +248,8 @@ class RecipeEditViewModel(
             title = r.title,
             prepTimeMinutesStr = if (r.prepTimeMinutes > 0) r.prepTimeMinutes.toString() else "",
             cookTimeMinutesStr = if (r.cookTimeMinutes > 0) r.cookTimeMinutes.toString() else "",
-            baseServingsStr = if (r.baseServings > 0) UnitConverter.formatAmount(r.baseServings, "порций") else "4",
-            yieldUnit = r.yieldUnit.ifBlank { "порций" },
+            baseServingsStr = if (r.baseServings > 0) UnitConverter.formatAmount(r.baseServings, AppLocaleManager.tr("порций", "servings")) else "4",
+            yieldUnit = r.yieldUnit.ifBlank { AppLocaleManager.tr("порций", "servings") },
             chefHeatingType = r.chefHeatingType,
             chefTemperature = r.chefTemperature,
             chefTiming = r.chefTiming,
@@ -265,16 +276,58 @@ class RecipeEditViewModel(
     ) {
         viewModelScope.launch {
             try {
+                val (canUse, reason) = com.aetnox.cooking.data.remote.AppStartupManager.canUseNetworkAi(context)
+                if (!canUse) {
+                    onError(reason)
+                    return@launch
+                }
+
+                onConnected()
+                val repo = BackendRepository(context.applicationContext)
+                val backendResult = if (!imageUriStr.isNullOrBlank()) {
+                    val imageData = GeminiApiService.readImageBase64(context, imageUriStr)
+                    if (imageData != null) {
+                        repo.parseRecipeFromImage(imageData.first, imageData.second)
+                    } else {
+                        repo.parseRecipeFromText(prompt)
+                    }
+                } else {
+                    repo.parseRecipeFromText(prompt)
+                }
+
+                if (backendResult.isSuccess) {
+                    val parsed = backendResult.getOrThrow().recipe.toParsedRecipe()
+                    populateFromParsedRecipe(parsed)
+                    onSuccess()
+                    return@launch
+                }
+
+                val backendErr = backendResult.exceptionOrNull()
+                if (backendErr is ApiException) {
+                    if (backendErr.errorCode == ApiErrorCodes.PHOTO_QUOTA_EXCEEDED) {
+                        onError(AppLocaleManager.tr("Месячный лимит фото-сканирования исчерпан. Лимит обновится 1-го числа или перейдите на старший тариф.", "Monthly photo scan limit reached. Limit resets on the 1st or upgrade your plan."))
+                        return@launch
+                    }
+                    if (backendErr.errorCode == ApiErrorCodes.QUOTA_EXCEEDED ||
+                        backendErr.errorCode == ApiErrorCodes.PHOTO_RESTRICTED ||
+                        backendErr.errorCode == ApiErrorCodes.FREE_TIER_QUARANTINE ||
+                        backendErr.errorCode == ApiErrorCodes.ACCOUNT_BANNED
+                    ) {
+                        onError(backendErr.message ?: AppLocaleManager.tr("Ошибка лимитов бэкенда", "Backend quota error"))
+                        return@launch
+                    }
+                }
+
+                // Fallback to direct Gemini API call
                 val parsed = GeminiApiService.generateRecipe(
                     context = context,
                     promptInput = prompt,
-                    imageUriStr = imageUriStr,
-                    onConnected = onConnected
+                    imageUriStr = imageUriStr
                 )
                 populateFromParsedRecipe(parsed)
                 onSuccess()
             } catch (e: Exception) {
-                onError(e.localizedMessage ?: "Ошибка оцифровки ИИ")
+                onError(com.aetnox.cooking.data.remote.NetworkDiagnostics.formatErrorMessage(context, e))
             }
         }
     }
@@ -472,7 +525,7 @@ class RecipeEditViewModel(
             title = r.title,
             prepTimeMinutesStr = if (r.prepTimeMinutes > 0) r.prepTimeMinutes.toString() else "",
             cookTimeMinutesStr = if (r.cookTimeMinutes > 0) r.cookTimeMinutes.toString() else "",
-            baseServingsStr = UnitConverter.formatAmount(r.baseServings, "шт"),
+            baseServingsStr = UnitConverter.formatAmount(r.baseServings, AppLocaleManager.tr("шт", "pcs")),
             yieldUnit = r.yieldUnit,
             notes = r.notes,
             sourceUrl = r.sourceUrl,
@@ -499,9 +552,9 @@ class RecipeEditViewModel(
             val cookMinutes = state.cookTimeMinutesStr.toIntOrNull() ?: 0
 
             val recipeTitle = if (state.isQuickDraft) {
-                state.title.ifBlank { "Быстрая заметка ${System.currentTimeMillis() % 10000}" }
+                state.title.ifBlank { "${AppLocaleManager.tr("Быстрая заметка", "Quick note")} ${System.currentTimeMillis() % 10000}" }
             } else {
-                state.title.ifBlank { "Новый рецепт" }
+                state.title.ifBlank { AppLocaleManager.tr("Новый рецепт", "New Recipe") }
             }
 
             val imagesJson = kotlinx.serialization.json.Json.encodeToString(state.imageUris)
@@ -513,8 +566,9 @@ class RecipeEditViewModel(
                 cookTimeMinutes = cookMinutes,
                 servingsEnabled = state.servingsEnabled,
                 baseServings = servingsVal,
-                yieldUnit = state.yieldUnit.ifBlank { "порций" },
+                yieldUnit = state.yieldUnit.ifBlank { AppLocaleManager.tr("порций", "servings") },
                 status = state.status,
+                isFavorite = state.isFavorite,
                 rating = state.rating,
                 postCookNote = state.postCookNote,
                 chefHeatingType = state.chefHeatingType,
@@ -542,10 +596,10 @@ class RecipeEditViewModel(
                 IngredientEntity(
                     id = item.id,
                     recipeId = state.recipeId,
-                    name = item.name.ifBlank { "Ингредиент ${idx + 1}" },
+                    name = item.name.ifBlank { "${AppLocaleManager.tr("Ингредиент", "Ingredient")} ${idx + 1}" },
                     amount = ingAmount,
-                    unit = item.unit.ifBlank { "г" },
-                    selectedUnit = item.selectedUnit.ifBlank { item.unit.ifBlank { "г" } },
+                    unit = item.unit.ifBlank { AppLocaleManager.tr("г", "g") },
+                    selectedUnit = item.selectedUnit.ifBlank { item.unit.ifBlank { AppLocaleManager.tr("г", "g") } },
                     note = combinedNote,
                     groupName = item.groupName,
                     orderIndex = idx

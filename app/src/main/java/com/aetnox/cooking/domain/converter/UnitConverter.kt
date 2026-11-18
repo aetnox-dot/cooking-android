@@ -1,5 +1,6 @@
 package com.aetnox.cooking.domain.converter
 
+import com.aetnox.cooking.ui.util.AppLocaleManager
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -12,6 +13,30 @@ data class DensityInfo(
 object UnitConverter {
 
     val SUPPORTED_UNITS = listOf("г", "кг", "мл", "л", "ст. л.", "ч. л.", "стакан", "шт")
+
+    fun getSupportedUnits(isEnglish: Boolean = AppLocaleManager.isEnglish): List<String> {
+        return if (isEnglish) {
+            listOf("g", "kg", "ml", "l", "tbsp", "tsp", "cup", "pc")
+        } else {
+            SUPPORTED_UNITS
+        }
+    }
+
+    fun formatUnitForDisplay(unit: String, isEnglish: Boolean = AppLocaleManager.isEnglish): String {
+        val norm = normalizeUnit(unit)
+        if (!isEnglish) return norm
+        return when (norm) {
+            "г" -> "g"
+            "кг" -> "kg"
+            "мл" -> "ml"
+            "л" -> "l"
+            "ст. л." -> "tbsp"
+            "ч. л." -> "tsp"
+            "стакан" -> "cup"
+            "шт" -> "pc"
+            else -> unit.trim()
+        }
+    }
 
     // Density table for common ingredients (grams per unit)
     private val DENSITY_TABLE = mapOf(
@@ -61,8 +86,8 @@ object UnitConverter {
         val massUnits = setOf("г", "кг")
         val volumeUnits = setOf("мл", "л", "ст. л.", "ч. л.", "стакан")
 
-        if (from in massUnits && to in massUnits) return true
-        if (from in volumeUnits && to in volumeUnits) return true
+        if ((from in massUnits) && (to in massUnits)) return true
+        if ((from in volumeUnits) && (to in volumeUnits)) return true
 
         // Cross-category mass <-> volume requires density info or custom factor
         if ((from in massUnits && to in volumeUnits) || (from in volumeUnits && to in massUnits)) {
@@ -224,10 +249,10 @@ object UnitConverter {
             u in listOf("kg", "кг", "килограмм", "килограмма") -> "кг"
             u in listOf("ml", "мл", "миллилитр", "миллилитра") -> "мл"
             u in listOf("l", "л", "литр", "литра") -> "л"
-            u in listOf("ст.л.", "ст. л.", "ст л", "столовая ложка", "столовые ложки") -> "ст. л."
-            u in listOf("ч.л.", "ч. л.", "ч л", "чайная ложка", "чайные ложки") -> "ч. л."
-            u in listOf("стакан", "стакана", "стаканов", "ст.") -> "стакан"
-            u in listOf("шт", "шт.", "штука", "штуки", "штук") -> "шт"
+            u in listOf("ст.л.", "ст. л.", "ст л", "столовая ложка", "столовые ложки", "tbsp") -> "ст. л."
+            u in listOf("ч.л.", "ч. л.", "ч л", "чайная ложка", "чайные ложки", "tsp") -> "ч. л."
+            u in listOf("стакан", "стакана", "стаканов", "ст.", "cup", "cups") -> "стакан"
+            u in listOf("шт", "шт.", "штука", "штуки", "штук", "pc", "pcs") -> "шт"
             else -> unit.trim()
         }
     }

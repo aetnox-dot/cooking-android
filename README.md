@@ -1,11 +1,18 @@
 # 🍳 Cooking — Smart Culinary Assistant & Recipe Book
 
+[![Latest Release](https://img.shields.io/badge/Release-v1.0.0-success.svg?style=flat&logo=github)](https://github.com/aetnox-dot/cooking-android/releases)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-2026.02.01-4285F4.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
 [![Material 3](https://img.shields.io/badge/Material%203-Latest-006C4C.svg?style=flat&logo=materialdesign)](https://m3.material.io)
 [![Nothing OS Design](https://img.shields.io/badge/Design-Nothing%20OS%20Style-D71921.svg?style=flat)](https://nothing.tech)
 
 **Cooking** is a modern Android application written in **Kotlin** and **Jetpack Compose** for organizing, creating, searching, and cooking recipes. It features an interactive AI sous-chef, automatic device manufacturer detection (Nothing Phone / Nothing OS styling), live dynamic serving recalculations, step-by-step cooking timers, and JSON backups.
+
+---
+
+## 📥 Download
+
+Get the latest APK directly from the [GitHub Releases Page](https://github.com/aetnox-dot/cooking-android/releases).
 
 ---
 

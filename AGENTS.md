@@ -9,6 +9,7 @@
 
 - **File → Sync Project with Gradle Files** (решает 90% случаев после консольных сборок или редактирования gradle файлов).
 - **File → Invalidate Caches → Invalidate and Restart** (если синхронизация не помогла).
+- **Ошибка `Activity class {...MainActivityAliasDefault} does not exist` при смене иконки**: В выпадающем меню рядом с кнопкой Run выберите **Edit Configurations...** → смените **Launch** с `Default Activity` на `Specified Activity` (`com.aetnox.cooking.MainActivity`).
 
 ## Консольная сборка (Git Bash)
 

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -630,11 +631,15 @@ private fun MockInitialSetupDemo() {
                         color = MaterialTheme.colorScheme.primary
                     )
 
-                    val previewResId = when (selectedIconVariant) {
-                        com.aetnox.cooking.ui.util.AppIconVariant.DEFAULT -> com.aetnox.cooking.R.mipmap.ic_launcher
-                        com.aetnox.cooking.ui.util.AppIconVariant.NEON -> com.aetnox.cooking.R.mipmap.ic_launcher_neon
-                        com.aetnox.cooking.ui.util.AppIconVariant.NIGHT_CHEF -> com.aetnox.cooking.R.mipmap.ic_launcher_night_chef
-                        com.aetnox.cooking.ui.util.AppIconVariant.NOTHING -> com.aetnox.cooking.R.mipmap.ic_launcher_nothing
+                    val (bgDrawableRes, fgDrawableRes) = when (selectedIconVariant) {
+                        com.aetnox.cooking.ui.util.AppIconVariant.DEFAULT ->
+                            com.aetnox.cooking.R.drawable.ic_launcher_background to com.aetnox.cooking.R.drawable.ic_launcher_foreground
+                        com.aetnox.cooking.ui.util.AppIconVariant.NEON ->
+                            com.aetnox.cooking.R.drawable.ic_launcher_background_neon to com.aetnox.cooking.R.drawable.ic_launcher_foreground_neon
+                        com.aetnox.cooking.ui.util.AppIconVariant.NIGHT_CHEF ->
+                            com.aetnox.cooking.R.drawable.ic_launcher_background_night_chef to com.aetnox.cooking.R.drawable.ic_launcher_foreground_night_chef
+                        com.aetnox.cooking.ui.util.AppIconVariant.NOTHING ->
+                            com.aetnox.cooking.R.drawable.ic_launcher_background_nothing to com.aetnox.cooking.R.drawable.ic_launcher_foreground_nothing
                     }
 
                     Box(
@@ -644,14 +649,18 @@ private fun MockInitialSetupDemo() {
                             .background(
                                 if (selectedIconVariant == com.aetnox.cooking.ui.util.AppIconVariant.NOTHING) Color.Black
                                 else MaterialTheme.colorScheme.primaryContainer
-                            )
-                            .padding(4.dp),
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
-                            painter = painterResource(id = previewResId),
+                            painter = painterResource(id = bgDrawableRes),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Image(
+                            painter = painterResource(id = fgDrawableRes),
                             contentDescription = selectedIconVariant.label,
-                            modifier = Modifier.size(52.dp)
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
 

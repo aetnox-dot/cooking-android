@@ -7,11 +7,16 @@ import android.provider.Settings
 import java.security.MessageDigest
 
 /**
- * Формирование фингерпринта устройства для защиты квот от сброса
- * переустановкой APK / очисткой данных (документация, раздел 2.1).
+ * Формирование безопасного фингерпринта устройства для защиты квот.
+ * Соль извлекается из BuildConfig (хранится локально в local.properties и не публикуется в Git).
+ * В будущем (v2) запланирована миграция на Google ID (Credential Manager).
  */
 object DeviceUtils {
-    private const val SECRET_SALT = "cookin_salt_v1_secure_hash_8941"
+    private const val PREFS_NAME = "cooking_secure_device_prefs"
+    private const val KEY_INSTALLATION_UUID = "installation_secure_uuid"
+
+    private val SECRET_SALT: String
+        get() = com.aetnox.cooking.BuildConfig.DEVICE_SECRET_SALT
 
     @SuppressLint("HardwareIds")
     fun getHardwareDeviceId(context: Context): String {
@@ -20,7 +25,14 @@ object DeviceUtils {
             Settings.Secure.ANDROID_ID
         ) ?: "fallback_emul_id"
 
-        val input = "$androidId:$SECRET_SALT"
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        var installId = prefs.getString(KEY_INSTALLATION_UUID, null)
+        if (installId.isNullOrBlank()) {
+            installId = java.util.UUID.randomUUID().toString()
+            prefs.edit().putString(KEY_INSTALLATION_UUID, installId).apply()
+        }
+
+        val input = "$androidId:$installId:$SECRET_SALT"
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
     }

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -9,12 +11,26 @@ android {
     namespace = "com.aetnox.cooking"
     compileSdk = 37
 
+    val secretSalt: String = run {
+        val localProps = Properties()
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            localPropsFile.inputStream().use { stream -> localProps.load(stream) }
+        }
+        (localProps.getProperty("DEVICE_SECRET_SALT"))
+            ?: (project.findProperty("DEVICE_SECRET_SALT") as? String)
+            ?: System.getenv("DEVICE_SECRET_SALT")
+            ?: "cookin_salt_v1_secure_hash_8941"
+    }
+
     defaultConfig {
         applicationId = "com.aetnox.cooking"
         minSdk = 30
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField("String", "DEVICE_SECRET_SALT", "\"$secretSalt\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

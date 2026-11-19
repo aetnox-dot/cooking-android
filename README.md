@@ -3,7 +3,6 @@
 ### Security
 * [VirusTotal](https://www.virustotal.com/gui/file/7ee5f56825acf5c0e785875de10c68fa7f23002c28d65a2f5e3e72fc8e30575b)
 * [Koodous](https://koodous.com/apks/7ee5f56825acf5c0e785875de10c68fa7f23002c28d65a2f5e3e72fc8e30575b)
-* SHA-256: `7ee5f56825acf5c0e785875de10c68fa7f23002c28d65a2f5e3e72fc8e30575b`
 
 
 

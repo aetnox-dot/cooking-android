@@ -1,5 +1,10 @@
 # 🍳 Cooking — Smart Culinary Assistant & Recipe Book
 
+### 🛡️ Security Scans
+* **SHA-256:** `7ee5f56825acf5c0e785875de10c68fa7f23002c28d65a2f5e3e72fc8e30575b`
+* **Reports:** [VirusTotal (0 detections)](https://www.virustotal.com/gui/file/7ee5f56825acf5c0e785875de10c68fa7f23002c28d65a2f5e3e72fc8e30575b) · [Koodous (Clean)](https://koodous.com/apks/7ee5f56825acf5c0e785875de10c68fa7f23002c28d65a2f5e3e72fc8e30575b)
+
+
 [![Latest Release](https://img.shields.io/badge/Release-v1.0.0-success.svg?style=flat&logo=github)](https://github.com/aetnox-dot/cooking-android/releases)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-2026.02.01-4285F4.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
